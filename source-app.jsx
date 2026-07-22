@@ -380,7 +380,7 @@ const pgBtn = (off) => ({ background: T.panelSoft, color: off ? T.muted : T.text
 // ═══════════════════════════════════════════════════════════════════
 
 // ── Aba 1: Visão Geral Comercial ──
-function AbaVisaoGeral({ data, extra, qual, schools }) {
+function AbaVisaoGeral({ data, extra, qual, fila, schools }) {
   const vg = data.visao_geral, fe = data.fechamentos, fea = data.fechamentos_ant, va = data.visao_ant;
   const kpiRow = (school) => {
     const v = bySchool(vg, school)[0] || {};
@@ -1908,7 +1908,8 @@ export default function DashboardEdilvo() {
   const [sdr, setSdr] = useState(null);
   const [jor, setJor] = useState(null);
   const [fresh, setFresh] = useState(null);
-  const [qual, setQual] = useState(null); // {from,to} quando período personalizado
+  const [qual, setQual] = useState(null);
+  const [fila, setFila] = useState(null);
   const [data, setData] = useState(LIVE ? null : SNAPSHOT);
   const [mkt, setMkt] = useState(null);
   const [extra, setExtra] = useState(null);
@@ -1936,9 +1937,10 @@ export default function DashboardEdilvo() {
       rpc("dashboard_sdr", { p_token: RPC_TOKEN, p_from: from, p_to: to, p_school: null }),
       rpc("dashboard_jornada", { p_token: RPC_TOKEN, p_from: from, p_to: to }),
       rpc("dashboard_qualidade", { p_token: RPC_TOKEN, p_from: from, p_to: to }),
+      rpc("dashboard_fila", { p_token: RPC_TOKEN, p_from: from, p_to: to }),
     ])
-      .then(([j, m, x, w, s, jo, q]) => {
-        setQual(q);
+      .then(([j, m, x, w, s, jo, q, fl]) => {
+        setQual(q); setFila(fl);
         if (w) { j = { ...j, vendedores: w.vendedores, cursos: w.cursos, faixas: w.faixas }; }
         setData(j); setMkt(m); setExtra(x); setSdr(s); setJor(jo); setLoading(false);
       })
@@ -2049,7 +2051,7 @@ export default function DashboardEdilvo() {
               <>
                 {menu === "comercial" && (
                   <>
-                    {aba === "visao" && <AbaVisaoGeral data={data} extra={extra} qual={qual} schools={schools} />}
+                    {aba === "visao" && <AbaVisaoGeral data={data} extra={extra} qual={qual} fila={fila} schools={schools} />}
                     {aba === "funil" && <AbaFunilPerdas data={data} schools={schools} />}
                     {aba === "vendedores" && <AbaVendedores data={data} schools={schools} />}
                     {aba === "origem" && <AbaOrigem data={data} extra={extra} schools={schools} />}
