@@ -478,22 +478,80 @@ function AbaVisaoGeral({ data, extra, qual, schools }) {
         </div>
       </Panel>
 
-      {qual && qual.fila && qual.fila.filter((f) => schools.includes(f.school)).length > 0 && (
-        <Panel title="Fila automática — leads sem resposta (não trabalhados)">
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 }}>
-            {qual.fila.filter((f) => schools.includes(f.school)).map((f) => (
-              <React.Fragment key={f.school}>
-                <Kpi accent={SCHOOLS[f.school].color} label={`Fila total · ${SCHOOLS[f.school].label}`} value={num(f.fila_total)} />
-                <Kpi accent={SCHOOLS[f.school].color} label={`Entraram no período · ${SCHOOLS[f.school].label}`} value={num(f.entraram_no_periodo)}
-                  delta={f.tendencia == null ? null : f.tendencia / 100} invert />
-              </React.Fragment>
-            ))}
-          </div>
-          <div style={{ fontSize: 11.5, color: T.muted, marginTop: 8, lineHeight: 1.6 }}>
-            Leads na etapa LEAD SEM RESPOSTA, em qualquer responsável. Ficam fora de "leads parados", das médias de conversão e dos rankings de vendedores, porque representam contato não estabelecido e não trabalho comercial. A seta ao lado das entradas do período compara com o período anterior: subindo (vermelho) significa mais leads caindo sem resposta — piora de cobertura; caindo (verde) é melhora. O volume acumulado é indicador estratégico de leads não trabalhados.
-          </div>
-        </Panel>
-      )}
+      {fila && (() => {
+        const per = (fila.por_periodo || []).filter((f) => schools.includes(f.school));
+        const ven = (fila.por_vendedor || []).filter((f) => schools.includes(f.school));
+        const eta = (fila.por_etapa || []).filter((f) => schools.includes(f.school));
+        const acu = (fila.acumulado || []).filter((f) => schools.includes(f.school));
+        const totalPeriodo = sum(per, "caiu_na_fila");
+        const totalAcum = sum(acu, "fila_acumulada");
+        if (totalPeriodo === 0 && totalAcum === 0) return null;
+        const etapasNomes = [...new Set(eta.map((e) => e.etapa_origem))];
+        const etaChart = etapasNomes.map((nome) => {
+          const row = { etapa: nome };
+          schools.forEach((s) => { row[s] = sum(eta.filter((e) => e.etapa_origem === nome && e.school === s), "caiu_na_fila"); });
+          row._t = schools.reduce((a, s) => a + row[s], 0);
+          return row;
+        }).sort((a, b) => b._t - a._t);
+        const vendNomes = [...new Set(ven.map((v) => v.vendedor))];
+        const venRows = vendNomes.map((nome) => {
+          const row = { vendedor: nome };
+          schools.forEach((s) => { row[s] = sum(ven.filter((v) => v.vendedor === nome && v.school === s), "caiu_na_fila"); });
+          row.total = schools.reduce((a, s) => a + row[s], 0);
+          return row;
+        }).sort((a, b) => b.total - a.total);
+
+        return (
+          <Panel title="Fila automática — leads sem resposta (rastreamento)">
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 10, marginBottom: 4 }}>
+              {per.map((f) => (
+                <Kpi key={f.school} accent={SCHOOLS[f.school].color} label={`Ca\u00edram na fila no per\u00edodo \u00b7 ${SCHOOLS[f.school].label}`} value={num(f.caiu_na_fila)} />
+              ))}
+              {acu.map((f) => (
+                <Kpi key={f.school + "a"} label={`Fila acumulada (hist\u00f3rico) \u00b7 ${SCHOOLS[f.school].label}`} value={num(f.fila_acumulada)} />
+              ))}
+            </div>
+            <div style={{ fontSize: 11.5, color: T.muted, margin: "6px 0 14px", lineHeight: 1.6 }}>
+              "Ca\u00edram na fila no per\u00edodo" respeita o filtro de data ativo (LEAD SEM RESPOSTA). Estes leads ficam fora de leads parados, das m\u00e9dias de convers\u00e3o e do ranking de vendedores \u2014 n\u00e3o s\u00e3o fracasso de convers\u00e3o, s\u00e3o contato n\u00e3o estabelecido. As tabelas abaixo s\u00e3o informativas, para achar gargalos por etapa e volume de carteira por vendedor.
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 14 }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>De qual etapa a fila est\u00e1 vazando</div>
+                {etaChart.length ? (
+                  <div style={{ width: "100%", height: Math.max(150, etaChart.length * 34 + 30) }}>
+                    <ResponsiveContainer>
+                      <BarChart data={etaChart} layout="vertical" margin={{ top: 0, right: 30, left: 10, bottom: 0 }} barGap={2}>
+                        <XAxis type="number" stroke={T.muted} fontSize={10} tickLine={false} axisLine={false} allowDecimals={false} />
+                        <YAxis type="category" dataKey="etapa" stroke={T.muted} fontSize={10.5} width={155} tickLine={false} axisLine={false} />
+                        <Tooltip content={<ChartTip />} cursor={{ fill: "#00000006" }} />
+                        {schools.map((s) => (
+                          <Bar key={s} dataKey={s} name={SCHOOLS[s].label} fill={SCHOOLS[s].color} radius={[0, 4, 4, 0]} maxBarSize={15}>
+                            <LabelList dataKey={s} position="right" fill={T.muted} fontSize={10} />
+                          </Bar>
+                        ))}
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : <Placeholder label="Nenhuma queda em fila no per\u00edodo" />}
+              </div>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>Volume de carteira por vendedor de origem</div>
+                <DataTable
+                  columns={[
+                    { key: "vendedor", label: "Vendedor de origem", style: { fontWeight: 500 } },
+                    ...schools.map((s) => ({ key: s, label: SCHOOLS[s].label, render: (r) => num(r[s]) })),
+                    { key: "total", label: "Total", render: (r) => <b>{num(r.total)}</b> },
+                  ]}
+                  rows={venRows}
+                  initialSort={{ key: "total", dir: "desc" }}
+                  pageSize={6}
+                />
+                <div style={{ fontSize: 11, color: T.muted, marginTop: 6 }}>Informativo: de quem era o lead antes de cair na fila. Volume/qualidade de carteira, n\u00e3o convers\u00e3o.</div>
+              </div>
+            </div>
+          </Panel>
+        );
+      })()}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 14 }}>
         <Panel title="Carteira atual (todos os leads em aberto, por etapa)">
