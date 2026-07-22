@@ -380,7 +380,7 @@ const pgBtn = (off) => ({ background: T.panelSoft, color: off ? T.muted : T.text
 // ═══════════════════════════════════════════════════════════════════
 
 // ── Aba 1: Visão Geral Comercial ──
-function AbaVisaoGeral({ data, extra, schools }) {
+function AbaVisaoGeral({ data, extra, qual, schools }) {
   const vg = data.visao_geral, fe = data.fechamentos, fea = data.fechamentos_ant, va = data.visao_ant;
   const kpiRow = (school) => {
     const v = bySchool(vg, school)[0] || {};
@@ -477,6 +477,22 @@ function AbaVisaoGeral({ data, extra, schools }) {
           </ResponsiveContainer>
         </div>
       </Panel>
+
+      {qual && qual.fila && qual.fila.filter((f) => schools.includes(f.school)).length > 0 && (
+        <Panel title="Fila automática — leads sem resposta (não trabalhados)">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 }}>
+            {qual.fila.filter((f) => schools.includes(f.school)).map((f) => (
+              <React.Fragment key={f.school}>
+                <Kpi accent={SCHOOLS[f.school].color} label={`Fila total · ${SCHOOLS[f.school].label}`} value={num(f.fila_total)} />
+                <Kpi accent={SCHOOLS[f.school].color} label={`Entraram no período · ${SCHOOLS[f.school].label}`} value={num(f.entraram_no_periodo)} />
+              </React.Fragment>
+            ))}
+          </div>
+          <div style={{ fontSize: 11.5, color: T.muted, marginTop: 8, lineHeight: 1.6 }}>
+            Leads na etapa LEAD SEM RESPOSTA, em qualquer responsável. Ficam fora de "leads parados", das médias de conversão e dos rankings de vendedores, porque representam contato não estabelecido e não trabalho comercial. O volume acumulado é indicador estratégico de leads não trabalhados.
+          </div>
+        </Panel>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 14 }}>
         <Panel title="Carteira atual (todos os leads em aberto, por etapa)">
@@ -1336,7 +1352,7 @@ function AbaJornada({ jor, schools }) {
 }
 
 // ═══════════════ MENU 2: MARKETING ═══════════════
-function MenuMarketing({ mkt, schools }) {
+function MenuMarketing({ mkt, qual, schools }) {
   if (!mkt) return <div style={{ color: T.muted, fontSize: 13, padding: 30, textAlign: "center" }}>Carregando dados de mídia…</div>;
   const kpis = mkt.kpis.filter((k) => schools.includes(k.school));
   const kpisAnt = mkt.kpis_ant || [];
@@ -1535,7 +1551,33 @@ function MenuMarketing({ mkt, schools }) {
         </div>
       </Panel>
 
-      <Panel title="Comparativo Meta × Google">
+      <Panel title="Atribuição de mídia — leads reportados × leads rastreados pela Origem">
+        {qual && qual.atribuicao_midia && qual.atribuicao_midia.filter((a) => schools.includes(a.school)).length ? (
+          <>
+            <DataTable
+              columns={[
+                { key: "school", label: "Escola", render: (r) => <SchoolTag school={r.school} /> },
+                { key: "canal", label: "Canal", render: (r) => r.canal === "GOOGLE" ? "Google" : "Meta" },
+                { key: "spend", label: "Investimento", render: (r) => brl(r.spend) },
+                { key: "leads_reportados", label: "Leads (plataforma)", render: (r) => num(r.leads_reportados) },
+                { key: "leads_origem", label: "Leads (Origem no Kommo)", render: (r) => num(r.leads_origem) },
+                { key: "cpl_origem", label: "CPL pela Origem", render: (r) => r.cpl_origem != null ? brl(r.cpl_origem) : "—" },
+                { key: "matriculas_origem", label: "Matrículas", render: (r) => num(r.matriculas_origem) },
+              ]}
+              rows={qual.atribuicao_midia.filter((a) => schools.includes(a.school))}
+              initialSort={{ key: "spend", dir: "desc" }}
+            />
+            <div style={{ border: `1px solid ${T.amber}55`, background: T.amber + "0d", borderRadius: 8, padding: "10px 12px", fontSize: 11.5, color: T.text, marginTop: 10, lineHeight: 1.6 }}>
+              <b>Como ler estas duas colunas.</b> "Leads (plataforma)" é o que Meta e Google reportam; "Leads (Origem no Kommo)" é o que foi efetivamente rastreado na entrada do lead.
+              O Meta reporta zero porque as conversões de mensagem não voltam para a plataforma — a Origem é a fonte confiável para ele.
+              O Google aparece subestimado na coluna da Origem: os cliques de busca paga chegam ao Kommo como SITE, e não como GOOGLE, até que a captação diferencie tráfego pago de orgânico.
+              Enquanto isso, use a plataforma para o Google e a Origem para o Meta.
+            </div>
+          </>
+        ) : <Placeholder label="Sem investimento no período" />}
+      </Panel>
+
+      <Panel title="Comparativo Meta × Google (leads reportados pelas plataformas)">
         <DataTable
           columns={[
             { key: "plataforma", label: "Plataforma", style: { fontWeight: 500 } },
@@ -1553,7 +1595,7 @@ function MenuMarketing({ mkt, schools }) {
 }
 
 // ═══════════════ MENU 3: HOME EXECUTIVO ═══════════════
-function MenuHome({ data, mkt, extra, schools, goTo }) {
+function MenuHome({ data, mkt, extra, qual, schools, goTo }) {
   if (!data || !mkt) return <div style={{ color: T.muted, fontSize: 13, padding: 30, textAlign: "center" }}>Carregando…</div>;
   const budgets = (mkt.budgets || []).filter((b) => schools.includes(b.school));
 
@@ -1610,6 +1652,21 @@ function MenuHome({ data, mkt, extra, schools, goTo }) {
     const med = convs.reduce((a, v) => a + v.conv, 0) / convs.length;
     if (convs[0].conv < med * 0.5) alertas.push({ tipo: "Vendedor abaixo", texto: `${convs[0].vendedor} (${SCHOOLS[convs[0].school].label}) converte ${pct(convs[0].conv)} vs. média ${pct(med)} — vale revisar carteira/abordagem` });
   }
+  // alertas de qualidade de dados
+  if (qual) {
+    (qual.qualidade || []).filter((q) => schools.includes(q.school)).forEach((q) => {
+      if (q.pct_origem != null && q.pct_origem < 70) {
+        const naoAtrib = (qual.atribuicao_midia || []).filter((a) => a.school === q.school).reduce((s, a) => s + Number(a.spend || 0) * (1 - Number(q.pct_origem) / 100), 0);
+        alertas.push({ tipo: "Rastreio incompleto", texto: `${SCHOOLS[q.school].label}: só ${String(q.pct_origem).replace(".", ",")}% dos leads têm Origem preenchida — ${brl(naoAtrib)} de investimento sem atribuição confiável no período` });
+      }
+    });
+    (qual.campanhas_zero || []).filter((c) => schools.includes(c.school)).forEach((c) => {
+      alertas.push({ tipo: "Campanha sem conversão", texto: `${c.campanha} (${SCHOOLS[c.school].label}): ${num(c.leads)} leads e nenhuma matrícula no período — revisar oferta, público ou qualificação` });
+    });
+    (qual.atribuicao_midia || []).filter((a) => schools.includes(a.school) && Number(a.spend) > 0 && Number(a.leads_origem) === 0 && Number(a.leads_reportados) === 0).forEach((a) => {
+      alertas.push({ tipo: "Investimento sem retorno rastreado", texto: `${a.canal === "GOOGLE" ? "Google" : "Meta"} ${SCHOOLS[a.school].label}: ${brl(a.spend)} investidos sem nenhum lead atribuído` });
+    });
+  }
   const utmQuebrada = data.campanhas.some((c) => c.campanha && c.campanha.includes("{"));
   if (alertas.length < 3 && utmQuebrada) alertas.push({ tipo: "Atribuição", texto: 'UTMs com macro literal "{campaignname}" detectadas — atribuição de campanha inativa até corrigir os parâmetros nos anúncios' });
 
@@ -1664,8 +1721,8 @@ function MenuHome({ data, mkt, extra, schools, goTo }) {
           />
         </Panel>
 
-        <Panel title="Top 3 alertas automáticos">
-          {alertas.length ? alertas.slice(0, 3).map((a, i) => (
+        <Panel title={`Alertas automáticos (${alertas.length})`}>
+          {alertas.length ? alertas.map((a, i) => (
             <div key={i} style={{ border: `1px solid ${T.amber}55`, background: T.amber + "0d", borderRadius: 8, padding: "10px 12px", fontSize: 12.5, marginBottom: 8 }}>
               <span style={{ fontWeight: 600, color: T.amber }}>{a.tipo}:</span> {a.texto}
             </div>
@@ -1770,7 +1827,8 @@ export default function DashboardEdilvo() {
   const [periodoAtualFrom, setPeriodoAtualFrom] = useState(null);
   const [sdr, setSdr] = useState(null);
   const [jor, setJor] = useState(null);
-  const [fresh, setFresh] = useState(null); // {from,to} quando período personalizado
+  const [fresh, setFresh] = useState(null);
+  const [qual, setQual] = useState(null); // {from,to} quando período personalizado
   const [data, setData] = useState(LIVE ? null : SNAPSHOT);
   const [mkt, setMkt] = useState(null);
   const [extra, setExtra] = useState(null);
@@ -1797,8 +1855,10 @@ export default function DashboardEdilvo() {
       rpc("dashboard_comercial_v3", { p_token: RPC_TOKEN, p_from: from, p_to: to }),
       rpc("dashboard_sdr", { p_token: RPC_TOKEN, p_from: from, p_to: to, p_school: null }),
       rpc("dashboard_jornada", { p_token: RPC_TOKEN, p_from: from, p_to: to }),
+      rpc("dashboard_qualidade", { p_token: RPC_TOKEN, p_from: from, p_to: to }),
     ])
-      .then(([j, m, x, w, s, jo]) => {
+      .then(([j, m, x, w, s, jo, q]) => {
+        setQual(q);
         if (w) { j = { ...j, vendedores: w.vendedores, cursos: w.cursos, faixas: w.faixas }; }
         setData(j); setMkt(m); setExtra(x); setSdr(s); setJor(jo); setLoading(false);
       })
@@ -1909,7 +1969,7 @@ export default function DashboardEdilvo() {
               <>
                 {menu === "comercial" && (
                   <>
-                    {aba === "visao" && <AbaVisaoGeral data={data} extra={extra} schools={schools} />}
+                    {aba === "visao" && <AbaVisaoGeral data={data} extra={extra} qual={qual} schools={schools} />}
                     {aba === "funil" && <AbaFunilPerdas data={data} schools={schools} />}
                     {aba === "vendedores" && <AbaVendedores data={data} schools={schools} />}
                     {aba === "origem" && <AbaOrigem data={data} extra={extra} schools={schools} />}
@@ -1919,8 +1979,8 @@ export default function DashboardEdilvo() {
                     {aba === "jornada" && <AbaJornada jor={jor} schools={schools} />}
                   </>
                 )}
-                {menu === "marketing" && <MenuMarketing mkt={mkt} schools={schools} />}
-                {menu === "home" && <MenuHome data={data} mkt={mkt} extra={extra} schools={schools} goTo={setMenu} />}
+                {menu === "marketing" && <MenuMarketing mkt={mkt} qual={qual} schools={schools} />}
+                {menu === "home" && <MenuHome data={data} mkt={mkt} extra={extra} qual={qual} schools={schools} goTo={setMenu} />}
               </>
             )}
           </div>
