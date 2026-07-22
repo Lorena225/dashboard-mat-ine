@@ -215,7 +215,259 @@ const{useState,useMemo,useEffect}=React,{BarChart,Bar,XAxis,YAxis,Tooltip,Respon
   );
 }
 
-const ABAS=[{id:"visao",label:"Vis\xE3o Geral"},{id:"funil",label:"Funil & Perdas"},{id:"vendedores",label:"Vendedores"},{id:"origem",label:"Origem, Canal & Regi\xE3o"},{id:"financeiro",label:"Financeiro & Produto"},{id:"sdr",label:"Agente SDR"}];function SyncBadge(){const[st,setSt]=React.useState(null);React.useEffect(()=>{if(!LIVE)return;const load=()=>fetch(`${SUPABASE_URL}/rest/v1/rpc/sync_status`,{method:"POST",headers:{"Content-Type":"application/json",apikey:window.EDILVO_ANON_KEY,Authorization:`Bearer ${window.EDILVO_ANON_KEY}`},body:JSON.stringify({p_token:RPC_TOKEN})}).then(r=>r.ok?r.json():null).then(d=>d&&!d.error&&setSt(d)).catch(()=>{});load();const t=setInterval(load,60000);return()=>clearInterval(t)},[]);if(!st)return null;const ago=ts=>{if(!ts)return"—";const m=Math.max(0,Math.round((new Date(st.agora)-new Date(ts))/60000));return m<1?"agora":m<60?`h\u00e1 ${m}min`:m<1440?`h\u00e1 ${Math.round(m/60)}h`:`h\u00e1 ${Math.round(m/1440)}d`};const dot=ts=>{if(!ts)return"#C0392B";const m=(new Date(st.agora)-new Date(ts))/60000;return m<=90?"#1E8449":m<=1500?"#B7950B":"#C0392B"};return React.createElement("div",{style:{display:"flex",gap:12,alignItems:"center",flexWrap:"wrap",fontSize:11,color:T.muted,padding:"4px 0"}},st.fontes.map(f=>React.createElement("span",{key:f.fonte,style:{display:"inline-flex",alignItems:"center",gap:4}},React.createElement("span",{style:{width:7,height:7,borderRadius:"50%",background:dot(f.ultimo_sync),display:"inline-block"}}),`${f.fonte}: ${ago(f.ultimo_sync)}`)))}function DashboardEdilvo(){const[i,l]=useState("home"),[n,p]=useState("mes_atual"),[y,k]=useState("todas"),[v,s]=useState("visao"),[d,h]=useState(""),[g,o]=useState(""),[b,e]=useState(null),[a,r]=useState(LIVE?null:SNAPSHOT),[t,m]=useState(null),[c,f]=useState(null),[x,S]=useState(LIVE),[w,C]=useState(null);useEffect(()=>{if(!LIVE)return;let u,z;if(n==="custom"){if(!b)return;u=b.from,z=b.to}else({from:u,to:z}=periodoRange(n));S(!0),C(null);const R=(L,A)=>fetch(`${SUPABASE_URL}/rest/v1/rpc/${L}`,{method:"POST",headers:{"Content-Type":"application/json",apikey:window.EDILVO_ANON_KEY,Authorization:`Bearer ${window.EDILVO_ANON_KEY}`},body:JSON.stringify(A)}).then(P=>{if(!P.ok)throw new Error(`HTTP ${P.status}`);return P.json()});Promise.all([R("dashboard_comercial",{p_token:RPC_TOKEN,p_from:u,p_to:z,p_school:null}),R("dashboard_marketing",{p_token:RPC_TOKEN,p_from:u,p_to:z}),R("dashboard_comercial_extra",{p_token:RPC_TOKEN,p_from:u,p_to:z}),R("dashboard_comercial_v3",{p_token:RPC_TOKEN,p_from:u,p_to:z}),R("dashboard_sdr",{p_token:RPC_TOKEN,p_from:u,p_to:z})]).then(([L,A,P,F,SD])=>{F&&(L={...L,vendedores:F.vendedores,cursos:F.cursos,multi_cursos:F.multi_cursos,sdr:SD}),r(L),m(A),f(P),S(!1)}).catch(L=>{C(String(L.message)),S(!1)})},[n,b]);const _=y==="todas"?["matricula_ead","ineprotec"]:[y],E=n==="custom"&&b?`${b.from.split("-").reverse().join("/")} \u2013 ${new Date(new Date(b.to)-864e5).toLocaleDateString("pt-BR")}`:(PERIODOS.find(u=>u.id===n)||{}).label,M=(u,z)=>({background:u?T.ink:"transparent",color:u?"#FFFFFF":T.ink,border:`1px solid ${u?T.ink:T.border}`,borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:500,cursor:"pointer",fontFamily:font,whiteSpace:"nowrap"}),$=u=>({display:"block",width:"100%",textAlign:"left",background:u?T.ink:"transparent",color:u?"#FFFFFF":T.ink,border:"none",borderRadius:8,padding:"10px 14px",fontSize:13,fontWeight:u?600:500,cursor:"pointer",fontFamily:font,marginBottom:4}),D={background:"#fff",color:T.text,border:`1px solid ${T.border}`,borderRadius:8,padding:"5px 8px",fontSize:12,fontFamily:font};return React.createElement("div",{style:{fontFamily:font,background:T.bg,color:T.text,minHeight:"100vh"}},React.createElement("style",null,`@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap'); *{box-sizing:border-box} body{margin:0} img{max-width:100%}
+function AbaJornada({ jor: i, schools: l }) {
+  if (!i)
+    return React.createElement(Placeholder, {
+      label: "Jornada & Origem",
+      detail: "Carregando jornada do lead e rastreamento por origem...",
+    });
+  const canais = (i.por_canal || []).filter((o) => l.includes(o.school)),
+    origens = (i.por_origem || []).filter((o) => l.includes(o.school)),
+    preench = (i.preenchimento || []).filter((o) => l.includes(o.school)),
+    jornada = (i.jornada || []).filter((o) => l.includes(o.school)),
+    tempos = (i.tempos_etapa || []).filter((o) => l.includes(o.school)),
+    ciclo = (i.ciclo || []).filter((o) => l.includes(o.school)),
+    origMat = (i.origem_matricula || []).filter((o) => l.includes(o.school)),
+    totLeads = sum(canais, "leads"),
+    totMats = sum(canais, "matriculas"),
+    totRec = sum(canais, "receita"),
+    comOrigem = sum(preench, "com_origem"),
+    totBase = sum(preench, "total"),
+    // funil agregado por etapa (ordem)
+    etapas = Object.values(
+      jornada.reduce((a, o) => {
+        const k = o.etapa;
+        a[k] = a[k] || { etapa: k, ordem: o.ordem, leads: 0 };
+        a[k].leads += Number(o.leads || 0);
+        return a;
+      }, {})
+    ).sort((a, b) => a.ordem - b.ordem),
+    // canal agregado p/ gráfico
+    canalAgg = Object.values(
+      canais.reduce((a, o) => {
+        const k = o.canal;
+        a[k] = a[k] || { canal: k, leads: 0, matriculas: 0 };
+        a[k].leads += Number(o.leads || 0);
+        a[k].matriculas += Number(o.matriculas || 0);
+        return a;
+      }, {})
+    ).sort((a, b) => b.leads - a.leads),
+    temposAgg = tempos.slice().sort((a, b) => b.horas_medias - a.horas_medias).slice(0, 10),
+    colsCanal = [
+      { key: "school", label: "Escola", render: (o) => React.createElement(SchoolTag, { school: o.school }) },
+      { key: "canal", label: "Canal de origem" },
+      { key: "leads", label: "Leads", render: (o) => num(o.leads) },
+      { key: "matriculas", label: "Matr\xEDculas", render: (o) => num(o.matriculas) },
+      {
+        key: "conv_pct",
+        label: "Convers\xE3o",
+        render: (o) => (o.conv_pct == null ? "\u2014" : String(o.conv_pct).replace(".", ",") + "%"),
+      },
+      { key: "receita", label: "Receita", render: (o) => brl(o.receita) },
+      { key: "perdidos", label: "Perdidos", render: (o) => num(o.perdidos) },
+    ],
+    colsOrigem = [
+      { key: "school", label: "Escola", render: (o) => React.createElement(SchoolTag, { school: o.school }) },
+      { key: "origem", label: "Origem (completa)" },
+      { key: "campanha", label: "Campanha" },
+      { key: "leads", label: "Leads", render: (o) => num(o.leads) },
+      { key: "matriculas", label: "Matr\xEDculas", render: (o) => num(o.matriculas) },
+      {
+        key: "conv_pct",
+        label: "Convers\xE3o",
+        render: (o) => (o.conv_pct == null ? "\u2014" : String(o.conv_pct).replace(".", ",") + "%"),
+      },
+      { key: "receita", label: "Receita", render: (o) => brl(o.receita) },
+    ],
+    colsMat = [
+      { key: "school", label: "Escola", render: (o) => React.createElement(SchoolTag, { school: o.school }) },
+      { key: "canal", label: "Canal" },
+      { key: "matriculas", label: "Matr\xEDculas", render: (o) => num(o.matriculas) },
+      {
+        key: "dias_ate_matricula",
+        label: "Dias at\xE9 matr\xEDcula",
+        render: (o) =>
+          o.dias_ate_matricula == null ? "\u2014" : String(o.dias_ate_matricula).replace(".", ","),
+      },
+      { key: "receita", label: "Receita", render: (o) => brl(o.receita) },
+    ];
+  return React.createElement(
+    React.Fragment,
+    null,
+    React.createElement(
+      "div",
+      {
+        style: {
+          background: T.panelSoft,
+          border: `1px solid ${T.border}`,
+          borderRadius: 10,
+          padding: "10px 14px",
+          fontSize: 12.5,
+          color: T.muted,
+          marginBottom: 14,
+        },
+      },
+      "Rastreamento pelo campo ",
+      React.createElement("b", { style: { color: T.text } }, "ORIGEM DO LEAD"),
+      " preenchido no cart\xE3o de cada lead (padr\xE3o ESCOLA-CANAL-CAMPANHA) + jornada do lead pelas etapas dos funis de vendas. Valores antigos fora do padr\xE3o s\xE3o convertidos automaticamente."
+    ),
+    React.createElement(
+      "div",
+      {
+        style: {
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+          gap: 10,
+          marginBottom: 14,
+        },
+      },
+      React.createElement(Kpi, { label: "Leads no per\xEDodo", value: num(totLeads), accent: T.gold }),
+      React.createElement(Kpi, { label: "Matr\xEDculas", value: num(totMats), accent: T.green }),
+      React.createElement(Kpi, { label: "Receita rastreada", value: brl(totRec), accent: T.green }),
+      React.createElement(Kpi, {
+        label: "Origem preenchida",
+        value: pct(totBase > 0 ? comOrigem / totBase : null),
+        accent: totBase > 0 && comOrigem / totBase >= 0.9 ? T.green : T.amber,
+      }),
+      ciclo.map((o) =>
+        React.createElement(Kpi, {
+          key: o.school,
+          label:
+            (o.school === "matricula_ead" ? "MAT" : "INE") + " \xB7 ciclo lead\u2192matr\xEDcula",
+          value:
+            o.dias_ate_matricula == null
+              ? "\u2014"
+              : String(o.dias_ate_matricula).replace(".", ",") + " dias",
+          accent: T.steel,
+        })
+      )
+    ),
+    React.createElement(
+      "div",
+      {
+        style: {
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+          gap: 14,
+          marginBottom: 14,
+        },
+      },
+      React.createElement(
+        Panel,
+        { title: "Jornada do lead \u2014 passagens por etapa do funil" },
+        React.createElement(
+          ResponsiveContainer,
+          { width: "100%", height: 260 },
+          React.createElement(
+            BarChart,
+            { data: etapas, layout: "vertical", margin: { left: 40 } },
+            React.createElement(CartesianGrid, { strokeDasharray: "3 3", stroke: T.border }),
+            React.createElement(XAxis, { type: "number", tick: { fontSize: 10 }, allowDecimals: !1 }),
+            React.createElement(YAxis, {
+              type: "category",
+              dataKey: "etapa",
+              tick: { fontSize: 10 },
+              width: 150,
+            }),
+            React.createElement(Tooltip, {}),
+            React.createElement(Bar, {
+              dataKey: "leads",
+              name: "Leads que passaram",
+              fill: T.gold,
+              radius: [0, 4, 4, 0],
+            })
+          )
+        )
+      ),
+      React.createElement(
+        Panel,
+        { title: "Leads e matr\xEDculas por canal de origem" },
+        React.createElement(
+          ResponsiveContainer,
+          { width: "100%", height: 260 },
+          React.createElement(
+            BarChart,
+            { data: canalAgg.slice(0, 8), margin: { bottom: 10 } },
+            React.createElement(CartesianGrid, { strokeDasharray: "3 3", stroke: T.border }),
+            React.createElement(XAxis, {
+              dataKey: "canal",
+              tick: { fontSize: 9 },
+              interval: 0,
+              angle: -20,
+              textAnchor: "end",
+              height: 50,
+            }),
+            React.createElement(YAxis, { tick: { fontSize: 10 }, allowDecimals: !1 }),
+            React.createElement(Tooltip, {}),
+            React.createElement(Legend, { wrapperStyle: { fontSize: 11 } }),
+            React.createElement(Bar, { dataKey: "leads", name: "Leads", fill: T.steel, radius: [4, 4, 0, 0] }),
+            React.createElement(Bar, {
+              dataKey: "matriculas",
+              name: "Matr\xEDculas",
+              fill: T.green,
+              radius: [4, 4, 0, 0],
+            })
+          )
+        )
+      )
+    ),
+    React.createElement(
+      Panel,
+      { title: "Tempo m\xE9dio de perman\xEAncia por etapa (horas) \u2014 onde o lead trava" },
+      React.createElement(
+        ResponsiveContainer,
+        { width: "100%", height: 220 },
+        React.createElement(
+          BarChart,
+          {
+            data: temposAgg.map((o) => ({
+              etapa: (o.school === "matricula_ead" ? "MAT \xB7 " : "INE \xB7 ") + o.etapa,
+              horas: Number(o.horas_medias),
+            })),
+            layout: "vertical",
+            margin: { left: 60 },
+          },
+          React.createElement(CartesianGrid, { strokeDasharray: "3 3", stroke: T.border }),
+          React.createElement(XAxis, { type: "number", tick: { fontSize: 10 } }),
+          React.createElement(YAxis, {
+            type: "category",
+            dataKey: "etapa",
+            tick: { fontSize: 10 },
+            width: 210,
+          }),
+          React.createElement(Tooltip, {}),
+          React.createElement(Bar, { dataKey: "horas", name: "Horas", fill: T.amber, radius: [0, 4, 4, 0] })
+        )
+      )
+    ),
+    React.createElement(
+      "div", { style: { height: 14 } }
+    ),
+    React.createElement(
+      Panel,
+      { title: "Matr\xEDculas por canal de origem \u2014 receita e velocidade" },
+      React.createElement(DataTable, { columns: colsMat, rows: origMat, pageSize: 10 })
+    ),
+    React.createElement(
+      "div", { style: { height: 14 } }
+    ),
+    React.createElement(
+      Panel,
+      { title: "Desempenho por canal de origem" },
+      React.createElement(DataTable, { columns: colsCanal, rows: canais, pageSize: 12 })
+    ),
+    React.createElement(
+      "div", { style: { height: 14 } }
+    ),
+    React.createElement(
+      Panel,
+      { title: "Origem completa (canal + campanha) \u2014 rastreamento detalhado" },
+      React.createElement(DataTable, { columns: colsOrigem, rows: origens, pageSize: 15 })
+    )
+  );
+}
+
+const ABAS=[{id:"visao",label:"Vis\xE3o Geral"},{id:"funil",label:"Funil & Perdas"},{id:"vendedores",label:"Vendedores"},{id:"origem",label:"Origem, Canal & Regi\xE3o"},{id:"financeiro",label:"Financeiro & Produto"},{id:"sdr",label:"Agente SDR"},{id:"jornada",label:"Jornada & Origem"}];function SyncBadge(){const[st,setSt]=React.useState(null);React.useEffect(()=>{if(!LIVE)return;const load=()=>fetch(`${SUPABASE_URL}/rest/v1/rpc/sync_status`,{method:"POST",headers:{"Content-Type":"application/json",apikey:window.EDILVO_ANON_KEY,Authorization:`Bearer ${window.EDILVO_ANON_KEY}`},body:JSON.stringify({p_token:RPC_TOKEN})}).then(r=>r.ok?r.json():null).then(d=>d&&!d.error&&setSt(d)).catch(()=>{});load();const t=setInterval(load,60000);return()=>clearInterval(t)},[]);if(!st)return null;const ago=ts=>{if(!ts)return"—";const m=Math.max(0,Math.round((new Date(st.agora)-new Date(ts))/60000));return m<1?"agora":m<60?`h\u00e1 ${m}min`:m<1440?`h\u00e1 ${Math.round(m/60)}h`:`h\u00e1 ${Math.round(m/1440)}d`};const dot=ts=>{if(!ts)return"#C0392B";const m=(new Date(st.agora)-new Date(ts))/60000;return m<=90?"#1E8449":m<=1500?"#B7950B":"#C0392B"};return React.createElement("div",{style:{display:"flex",gap:12,alignItems:"center",flexWrap:"wrap",fontSize:11,color:T.muted,padding:"4px 0"}},st.fontes.map(f=>React.createElement("span",{key:f.fonte,style:{display:"inline-flex",alignItems:"center",gap:4}},React.createElement("span",{style:{width:7,height:7,borderRadius:"50%",background:dot(f.ultimo_sync),display:"inline-block"}}),`${f.fonte}: ${ago(f.ultimo_sync)}`)))}function DashboardEdilvo(){const[i,l]=useState("home"),[n,p]=useState("mes_atual"),[y,k]=useState("todas"),[v,s]=useState("visao"),[d,h]=useState(""),[g,o]=useState(""),[b,e]=useState(null),[a,r]=useState(LIVE?null:SNAPSHOT),[t,m]=useState(null),[c,f]=useState(null),[x,S]=useState(LIVE),[w,C]=useState(null);useEffect(()=>{if(!LIVE)return;let u,z;if(n==="custom"){if(!b)return;u=b.from,z=b.to}else({from:u,to:z}=periodoRange(n));S(!0),C(null);const R=(L,A)=>fetch(`${SUPABASE_URL}/rest/v1/rpc/${L}`,{method:"POST",headers:{"Content-Type":"application/json",apikey:window.EDILVO_ANON_KEY,Authorization:`Bearer ${window.EDILVO_ANON_KEY}`},body:JSON.stringify(A)}).then(P=>{if(!P.ok)throw new Error(`HTTP ${P.status}`);return P.json()});Promise.all([R("dashboard_comercial",{p_token:RPC_TOKEN,p_from:u,p_to:z,p_school:null}),R("dashboard_marketing",{p_token:RPC_TOKEN,p_from:u,p_to:z}),R("dashboard_comercial_extra",{p_token:RPC_TOKEN,p_from:u,p_to:z}),R("dashboard_comercial_v3",{p_token:RPC_TOKEN,p_from:u,p_to:z}),R("dashboard_sdr",{p_token:RPC_TOKEN,p_from:u,p_to:z}),R("dashboard_jornada",{p_token:RPC_TOKEN,p_from:u,p_to:z})]).then(([L,A,P,F,SD,JN])=>{F&&(L={...L,vendedores:F.vendedores,cursos:F.cursos,multi_cursos:F.multi_cursos,sdr:SD,jornada_rpc:JN}),r(L),m(A),f(P),S(!1)}).catch(L=>{C(String(L.message)),S(!1)})},[n,b]);const _=y==="todas"?["matricula_ead","ineprotec"]:[y],E=n==="custom"&&b?`${b.from.split("-").reverse().join("/")} \u2013 ${new Date(new Date(b.to)-864e5).toLocaleDateString("pt-BR")}`:(PERIODOS.find(u=>u.id===n)||{}).label,M=(u,z)=>({background:u?T.ink:"transparent",color:u?"#FFFFFF":T.ink,border:`1px solid ${u?T.ink:T.border}`,borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:500,cursor:"pointer",fontFamily:font,whiteSpace:"nowrap"}),$=u=>({display:"block",width:"100%",textAlign:"left",background:u?T.ink:"transparent",color:u?"#FFFFFF":T.ink,border:"none",borderRadius:8,padding:"10px 14px",fontSize:13,fontWeight:u?600:500,cursor:"pointer",fontFamily:font,marginBottom:4}),D={background:"#fff",color:T.text,border:`1px solid ${T.border}`,borderRadius:8,padding:"5px 8px",fontSize:12,fontFamily:font};return React.createElement("div",{style:{fontFamily:font,background:T.bg,color:T.text,minHeight:"100vh"}},React.createElement("style",null,`@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap'); *{box-sizing:border-box} body{margin:0} img{max-width:100%}
         .layout{display:flex;min-height:100vh}
         .sidebar{width:225px;flex-shrink:0;border-right:1px solid ${T.border};padding:18px 14px;position:sticky;top:0;height:100vh;overflow-y:auto;background:#fff;display:flex;flex-direction:column}
         .content{flex:1;min-width:0}
@@ -227,4 +479,4 @@ const ABAS=[{id:"visao",label:"Vis\xE3o Geral"},{id:"funil",label:"Funil & Perda
           .sidebar nav button{width:auto;white-space:nowrap}
           .pad{padding:12px 10px 30px !important}
           table{font-size:11px !important}
-        }`),React.createElement("div",{className:"layout"},React.createElement("aside",{className:"sidebar"},React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:8,margin:"12px 0 18px"}},React.createElement("img",{src:"https://ineprotec-landing.vercel.app/images/logo.png",alt:"Ineprotec",style:{height:34,alignSelf:"flex-start"},onError:u=>{u.target.style.display="none"}}),React.createElement("img",{src:"https://matriculaead-landing.vercel.app/images/logo.png",alt:"Matr\xEDcula EAD",style:{height:34,alignSelf:"flex-start"},onError:u=>{u.target.style.display="none"}})),React.createElement("nav",null,MENUS.map(u=>React.createElement("button",{key:u.id,onClick:()=>l(u.id),style:$(i===u.id)},u.label))),i==="comercial"&&React.createElement("div",{className:"subnav",style:{marginTop:10,paddingTop:10,borderTop:`1px solid ${T.border}`}},ABAS.map(u=>React.createElement("button",{key:u.id,onClick:()=>s(u.id),style:{...$(v===u.id),fontSize:12,padding:"8px 12px",background:v===u.id?T.panelSoft:"transparent",color:T.ink,borderLeft:v===u.id?`3px solid ${T.ink}`:"3px solid transparent",borderRadius:6}},u.label))),React.createElement("div",{style:{marginTop:"auto",paddingTop:14,fontSize:11,color:T.muted}},"@AgenciaVirtruvia")),React.createElement("div",{className:"content"},React.createElement("div",{style:{borderBottom:`1px solid ${T.border}`,padding:"12px 18px",background:"#fff",position:"sticky",top:0,zIndex:20,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}},React.createElement("div",{style:{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}},React.createElement("span",{style:{fontSize:11,color:T.muted,marginRight:2}},"Per\xEDodo"),PERIODOS.map(u=>React.createElement("button",{key:u.id,onClick:()=>p(u.id),style:M(n===u.id)},u.label)),React.createElement("button",{onClick:()=>p("custom"),style:M(n==="custom")},"Personalizado"),n==="custom"&&React.createElement("span",{style:{display:"inline-flex",gap:5,alignItems:"center"}},React.createElement("input",{type:"date",value:d,onChange:u=>h(u.target.value),style:D}),React.createElement("span",{style:{color:T.muted,fontSize:12}},"at\xE9"),React.createElement("input",{type:"date",value:g,onChange:u=>o(u.target.value),style:D}),React.createElement("button",{disabled:!d||!g,onClick:()=>{const u=new Date(g);u.setDate(u.getDate()+1),e({from:d,to:u.toISOString().slice(0,10)})},style:{...M(!0),opacity:d&&g?1:.4}},"Aplicar"))),React.createElement("div",{style:{display:"flex",gap:5}},React.createElement("button",{onClick:()=>k("todas"),style:M(y==="todas")},"Todas"),React.createElement("button",{onClick:()=>k("matricula_ead"),style:{...M(y==="matricula_ead"),...y==="matricula_ead"?{background:T.gold,borderColor:T.gold}:{}}},"Matr\xEDcula EAD"),React.createElement("button",{onClick:()=>k("ineprotec"),style:{...M(y==="ineprotec"),...y==="ineprotec"?{background:T.steel,borderColor:T.steel}:{}}},"Ineprotec"))),React.createElement("div",{className:"pad",style:{padding:"16px 18px 40px",maxWidth:1240}},React.createElement("div",{style:{fontSize:11.5,color:T.muted,marginBottom:10}},MENUS.find(u=>u.id===i)?.label,i==="comercial"?` \xB7 ${ABAS.find(u=>u.id===v)?.label}`:""," \xB7 per\xEDodo: ",E||"\u2014"," \xB7 escolas sempre lado a lado, nunca somadas"),React.createElement(SyncBadge,null),n==="custom"&&!b&&React.createElement("div",{style:{color:T.muted,fontSize:13,padding:30,textAlign:"center"}},"Escolha as datas e clique em Aplicar."),x&&React.createElement("div",{style:{color:T.muted,fontSize:13,padding:30,textAlign:"center"}},"Carregando dados\u2026"),w&&React.createElement("div",{style:{color:T.red,fontSize:13,padding:30,textAlign:"center"}},"N\xE3o foi poss\xEDvel carregar os dados agora (",w,"). Tente novamente em instantes."),a&&!x&&!w&&React.createElement(React.Fragment,null,i==="comercial"&&React.createElement(React.Fragment,null,v==="visao"&&React.createElement(AbaVisaoGeral,{data:a,extra:c,schools:_}),v==="funil"&&React.createElement(AbaFunilPerdas,{data:a,schools:_}),v==="vendedores"&&React.createElement(AbaVendedores,{data:a,schools:_}),v==="origem"&&React.createElement(AbaOrigem,{data:a,extra:c,schools:_}),v==="financeiro"&&React.createElement(AbaFinanceiro,{data:a,schools:_}),v==="sdr"&&React.createElement(AbaSDR,{sdr:a.sdr,schools:_})),i==="marketing"&&React.createElement(MenuMarketing,{mkt:t,schools:_}),i==="home"&&React.createElement(MenuHome,{data:a,mkt:t,extra:c,schools:_,goTo:l}))))))}ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(DashboardEdilvo));
+        }`),React.createElement("div",{className:"layout"},React.createElement("aside",{className:"sidebar"},React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:8,margin:"12px 0 18px"}},React.createElement("img",{src:"https://ineprotec-landing.vercel.app/images/logo.png",alt:"Ineprotec",style:{height:34,alignSelf:"flex-start"},onError:u=>{u.target.style.display="none"}}),React.createElement("img",{src:"https://matriculaead-landing.vercel.app/images/logo.png",alt:"Matr\xEDcula EAD",style:{height:34,alignSelf:"flex-start"},onError:u=>{u.target.style.display="none"}})),React.createElement("nav",null,MENUS.map(u=>React.createElement("button",{key:u.id,onClick:()=>l(u.id),style:$(i===u.id)},u.label))),i==="comercial"&&React.createElement("div",{className:"subnav",style:{marginTop:10,paddingTop:10,borderTop:`1px solid ${T.border}`}},ABAS.map(u=>React.createElement("button",{key:u.id,onClick:()=>s(u.id),style:{...$(v===u.id),fontSize:12,padding:"8px 12px",background:v===u.id?T.panelSoft:"transparent",color:T.ink,borderLeft:v===u.id?`3px solid ${T.ink}`:"3px solid transparent",borderRadius:6}},u.label))),React.createElement("div",{style:{marginTop:"auto",paddingTop:14,fontSize:11,color:T.muted}},"@AgenciaVirtruvia")),React.createElement("div",{className:"content"},React.createElement("div",{style:{borderBottom:`1px solid ${T.border}`,padding:"12px 18px",background:"#fff",position:"sticky",top:0,zIndex:20,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}},React.createElement("div",{style:{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}},React.createElement("span",{style:{fontSize:11,color:T.muted,marginRight:2}},"Per\xEDodo"),PERIODOS.map(u=>React.createElement("button",{key:u.id,onClick:()=>p(u.id),style:M(n===u.id)},u.label)),React.createElement("button",{onClick:()=>p("custom"),style:M(n==="custom")},"Personalizado"),n==="custom"&&React.createElement("span",{style:{display:"inline-flex",gap:5,alignItems:"center"}},React.createElement("input",{type:"date",value:d,onChange:u=>h(u.target.value),style:D}),React.createElement("span",{style:{color:T.muted,fontSize:12}},"at\xE9"),React.createElement("input",{type:"date",value:g,onChange:u=>o(u.target.value),style:D}),React.createElement("button",{disabled:!d||!g,onClick:()=>{const u=new Date(g);u.setDate(u.getDate()+1),e({from:d,to:u.toISOString().slice(0,10)})},style:{...M(!0),opacity:d&&g?1:.4}},"Aplicar"))),React.createElement("div",{style:{display:"flex",gap:5}},React.createElement("button",{onClick:()=>k("todas"),style:M(y==="todas")},"Todas"),React.createElement("button",{onClick:()=>k("matricula_ead"),style:{...M(y==="matricula_ead"),...y==="matricula_ead"?{background:T.gold,borderColor:T.gold}:{}}},"Matr\xEDcula EAD"),React.createElement("button",{onClick:()=>k("ineprotec"),style:{...M(y==="ineprotec"),...y==="ineprotec"?{background:T.steel,borderColor:T.steel}:{}}},"Ineprotec"))),React.createElement("div",{className:"pad",style:{padding:"16px 18px 40px",maxWidth:1240}},React.createElement("div",{style:{fontSize:11.5,color:T.muted,marginBottom:10}},MENUS.find(u=>u.id===i)?.label,i==="comercial"?` \xB7 ${ABAS.find(u=>u.id===v)?.label}`:""," \xB7 per\xEDodo: ",E||"\u2014"," \xB7 escolas sempre lado a lado, nunca somadas"),React.createElement(SyncBadge,null),n==="custom"&&!b&&React.createElement("div",{style:{color:T.muted,fontSize:13,padding:30,textAlign:"center"}},"Escolha as datas e clique em Aplicar."),x&&React.createElement("div",{style:{color:T.muted,fontSize:13,padding:30,textAlign:"center"}},"Carregando dados\u2026"),w&&React.createElement("div",{style:{color:T.red,fontSize:13,padding:30,textAlign:"center"}},"N\xE3o foi poss\xEDvel carregar os dados agora (",w,"). Tente novamente em instantes."),a&&!x&&!w&&React.createElement(React.Fragment,null,i==="comercial"&&React.createElement(React.Fragment,null,v==="visao"&&React.createElement(AbaVisaoGeral,{data:a,extra:c,schools:_}),v==="funil"&&React.createElement(AbaFunilPerdas,{data:a,schools:_}),v==="vendedores"&&React.createElement(AbaVendedores,{data:a,schools:_}),v==="origem"&&React.createElement(AbaOrigem,{data:a,extra:c,schools:_}),v==="financeiro"&&React.createElement(AbaFinanceiro,{data:a,schools:_}),v==="sdr"&&React.createElement(AbaSDR,{sdr:a.sdr,schools:_}),v==="jornada"&&React.createElement(AbaJornada,{jor:a.jornada_rpc,schools:_})),i==="marketing"&&React.createElement(MenuMarketing,{mkt:t,schools:_}),i==="home"&&React.createElement(MenuHome,{data:a,mkt:t,extra:c,schools:_,goTo:l}))))))}ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(DashboardEdilvo));
