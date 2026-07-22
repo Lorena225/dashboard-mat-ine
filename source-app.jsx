@@ -661,8 +661,11 @@ function AbaVendedores({ data, schools }) {
   const rows0 = data.vendedores
     .filter((v) => schools.includes(v.school))
     .map((v) => ({ ...v, conversao: v.leads_atribuidos > 0 ? v.matriculas / v.leads_atribuidos : 0 }));
-  const nomes = [...new Set(rows0.map((v) => v.vendedor))].sort();
-  const rows = selVend === "todos" ? rows0 : rows0.filter((v) => v.vendedor === selVend);
+  const nomes = [...new Set(rows0.filter((v) => !(v.generico || ["INEPROTEC", "MATRICULA EAD", "(sem responsável)"].includes(v.vendedor))).map((v) => v.vendedor))].sort();
+  const ehGenerico = (v) => v.generico || ["INEPROTEC", "MATRICULA EAD", "(sem responsável)"].includes(v.vendedor);
+  const rowsHumanos = rows0.filter((v) => !ehGenerico(v));
+  const rowsGenericos = rows0.filter(ehGenerico);
+  const rows = selVend === "todos" ? rowsHumanos : rowsHumanos.filter((v) => v.vendedor === selVend);
 
   const cols = [
     { key: "vendedor", label: "Vendedor", style: { fontWeight: 500 } },
@@ -727,6 +730,24 @@ function AbaVendedores({ data, schools }) {
         </select>}>
         <DataTable columns={cols} rows={rows} initialSort={{ key: "matriculas", dir: "desc" }} />
       </Panel>
+      {rowsGenericos.length > 0 && (
+        <Panel title="Contas genéricas e sem responsável (fora do ranking)">
+          <DataTable
+            columns={[
+              { key: "vendedor", label: "Conta" },
+              { key: "school", label: "Escola", render: (r) => <SchoolTag school={r.school} /> },
+              { key: "leads_atribuidos", label: "Leads", render: (r) => num(r.leads_atribuidos) },
+              { key: "matriculas", label: "Matrículas", render: (r) => String(Math.round(r.matriculas * 10) / 10).replace(".", ",") },
+              { key: "faturamento", label: "Faturamento", render: (r) => brl(r.faturamento) },
+            ]}
+            rows={rowsGenericos}
+            initialSort={{ key: "leads_atribuidos", dir: "desc" }}
+            pageSize={5}
+          />
+          <div style={{ fontSize: 11.5, color: T.muted, marginTop: 8 }}>Contas da própria escola ou leads sem responsável atribuído. Ficam separadas para não distorcer médias e rankings, mas o volume continua visível.</div>
+        </Panel>
+      )}
+
       <Panel title="Tempo médio de primeira resposta por vendedor">
         <Placeholder label="Métrica em construção" detail="Ativada junto com o histórico de interações — mesma dependência da aba Funil & Perdas." />
       </Panel>
