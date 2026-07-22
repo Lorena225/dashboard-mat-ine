@@ -484,12 +484,13 @@ function AbaVisaoGeral({ data, extra, qual, schools }) {
             {qual.fila.filter((f) => schools.includes(f.school)).map((f) => (
               <React.Fragment key={f.school}>
                 <Kpi accent={SCHOOLS[f.school].color} label={`Fila total · ${SCHOOLS[f.school].label}`} value={num(f.fila_total)} />
-                <Kpi accent={SCHOOLS[f.school].color} label={`Entraram no período · ${SCHOOLS[f.school].label}`} value={num(f.entraram_no_periodo)} />
+                <Kpi accent={SCHOOLS[f.school].color} label={`Entraram no período · ${SCHOOLS[f.school].label}`} value={num(f.entraram_no_periodo)}
+                  delta={f.tendencia == null ? null : f.tendencia / 100} invert />
               </React.Fragment>
             ))}
           </div>
           <div style={{ fontSize: 11.5, color: T.muted, marginTop: 8, lineHeight: 1.6 }}>
-            Leads na etapa LEAD SEM RESPOSTA, em qualquer responsável. Ficam fora de "leads parados", das médias de conversão e dos rankings de vendedores, porque representam contato não estabelecido e não trabalho comercial. O volume acumulado é indicador estratégico de leads não trabalhados.
+            Leads na etapa LEAD SEM RESPOSTA, em qualquer responsável. Ficam fora de "leads parados", das médias de conversão e dos rankings de vendedores, porque representam contato não estabelecido e não trabalho comercial. A seta ao lado das entradas do período compara com o período anterior: subindo (vermelho) significa mais leads caindo sem resposta — piora de cobertura; caindo (verde) é melhora. O volume acumulado é indicador estratégico de leads não trabalhados.
           </div>
         </Panel>
       )}
