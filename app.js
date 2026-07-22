@@ -6,22 +6,24 @@ const{useState,useMemo,useEffect}=React,{BarChart,Bar,XAxis,YAxis,Tooltip,Respon
     });
   const y = (i.resumo || []).filter((o) => l.includes(o.school)),
     tot = (k) => y.reduce((a, o) => a + Number(o[k] || 0), 0),
-    atendidos = tot("leads_atendidos"),
-    diretas = tot("convertidos_direto"),
+    recebidos = tot("leads_recebidos"),
+    fila = tot("em_triagem_agora"),
+    processados = tot("leads_processados"),
+    diretas = tot("matriculas_diretas"),
+    recDireta = tot("receita_direta"),
     handoff = tot("p_atendimento_humano"),
     convHum = tot("convertidos_por_humano"),
-    semResp = tot("marcados_sem_resposta") || tot("sem_resposta_atual"),
-    perdas = tot("marcados_perdidos") || tot("perdidos_atual"),
-    matTot = tot("matriculas_totais"),
-    recTot = tot("receita_total"),
+    semResp = tot("sem_resposta"),
+    perdas = tot("perdas"),
     serie = (i.serie || []).filter((o) => l.includes(o.school)),
     dias = [...new Set(serie.map((o) => o.dia))].sort(),
     serieAgg = dias.map((d) => {
       const rows = serie.filter((o) => o.dia === d);
       return {
         dia: d.slice(5),
-        leads: sum(rows, "leads"),
-        handoffs: sum(rows, "handoffs"),
+        entradas: sum(rows, "entradas"),
+        humano: sum(rows, "humano"),
+        diretas: sum(rows, "diretas"),
         perdas: sum(rows, "perdas"),
       };
     }),
@@ -34,23 +36,29 @@ const{useState,useMemo,useEffect}=React,{BarChart,Bar,XAxis,YAxis,Tooltip,Respon
         return a;
       }, {})
     ).sort((a, b) => b.movs - a.movs),
-    tri = (i.triagem || []).filter((o) => l.includes(o.school)),
-    triEntradas = sum(tri, "entradas"),
+    semDados = recebidos === 0 && processados === 0 && fila === 0,
     cols = [
       {
         key: "school",
         label: "Escola",
         render: (o) => React.createElement(SchoolTag, { school: o.school }),
       },
-      { key: "leads_atendidos", label: "Leads atendidos", render: (o) => num(o.leads_atendidos) },
-      { key: "movimentacoes", label: "A\xE7\xF5es do bot", render: (o) => num(o.movimentacoes) },
-      { key: "convertidos_direto", label: "Matr\xEDcula direta", render: (o) => num(o.convertidos_direto) },
+      { key: "leads_recebidos", label: "Receberam triagem", render: (o) => num(o.leads_recebidos) },
+      { key: "em_triagem_agora", label: "Na fila agora", render: (o) => num(o.em_triagem_agora) },
+      { key: "matriculas_diretas", label: "Matr\xEDcula direta", render: (o) => num(o.matriculas_diretas) },
+      { key: "receita_direta", label: "Receita direta", render: (o) => brl(o.receita_direta) },
       { key: "p_atendimento_humano", label: "\u2192 Atend. humano", render: (o) => num(o.p_atendimento_humano) },
       { key: "convertidos_por_humano", label: "Convertidos p\xF3s-handoff", render: (o) => num(o.convertidos_por_humano) },
-      { key: "sem_resposta_atual", label: "Sem resposta", render: (o) => num(o.sem_resposta_atual) },
-      { key: "perdidos_atual", label: "Perdidos", render: (o) => num(o.perdidos_atual) },
-      { key: "em_andamento", label: "Em andamento", render: (o) => num(o.em_andamento) },
-      { key: "receita_total", label: "Receita gerada", render: (o) => brl(o.receita_total) },
+      { key: "sem_resposta", label: "Sem resposta", render: (o) => num(o.sem_resposta) },
+      { key: "perdas", label: "Perdidos", render: (o) => num(o.perdas) },
+      {
+        key: "horas_medias_triagem",
+        label: "Tempo m\xE9dio (h)",
+        render: (o) =>
+          o.horas_medias_triagem == null
+            ? "\u2014"
+            : Number(o.horas_medias_triagem).toFixed(1).replace(".", ","),
+      },
     ];
   return React.createElement(
     React.Fragment,
@@ -59,26 +67,20 @@ const{useState,useMemo,useEffect}=React,{BarChart,Bar,XAxis,YAxis,Tooltip,Respon
       "div",
       {
         style: {
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-          gap: 10,
+          background: T.panelSoft,
+          border: `1px solid ${T.border}`,
+          borderRadius: 10,
+          padding: "10px 14px",
+          fontSize: 12.5,
+          color: T.muted,
           marginBottom: 14,
         },
       },
-      React.createElement(Kpi, { label: "Leads atendidos pelo SDR", value: num(atendidos), accent: T.gold }),
-      React.createElement(Kpi, { label: "Matr\xEDculas diretas (bot)", value: num(diretas), accent: T.green }),
-      React.createElement(Kpi, { label: "Enviados p/ atend. humano", value: num(handoff), accent: T.steel }),
-      React.createElement(Kpi, { label: "Convertidos p\xF3s-handoff", value: num(convHum), accent: T.green }),
-      React.createElement(Kpi, { label: "Sem resposta", value: num(semResp), accent: T.amber }),
-      React.createElement(Kpi, { label: "Matr\xEDculas perdidas", value: num(perdas), accent: T.red }),
-      React.createElement(Kpi, {
-        label: "Convers\xE3o dos atendidos",
-        value: pct(atendidos > 0 ? matTot / atendidos : null),
-        accent: T.gold,
-      }),
-      React.createElement(Kpi, { label: "Receita influenciada", value: brl(recTot), accent: T.green })
+      "Base de an\xE1lise: etapa ",
+      React.createElement("b", { style: { color: T.text } }, "TRIAGEM E QUALIFICA\xC7\xC3O"),
+      " dos funis MAT FUNIL DE VENDAS e INE - FUNIL DE VENDAS \u2014 atendimento exclusivo do agente SDR. Convers\xE3o direta = lead levado de Triagem a Matr\xEDcula Realizada; handoff = transfer\xEAncia para as etapas dos vendedores."
     ),
-    triEntradas === 0 &&
+    semDados &&
       React.createElement(
         "div",
         {
@@ -92,8 +94,37 @@ const{useState,useMemo,useEffect}=React,{BarChart,Bar,XAxis,YAxis,Tooltip,Respon
             marginBottom: 14,
           },
         },
-        "Aten\xE7\xE3o: a etapa TRIAGEM E QUALIFICA\xC7\xC3O n\xE3o registrou passagens neste per\xEDodo. O agente SDR est\xE1 atuando nas etapas de Entrada e Potenciais, transferindo direto para Follow Up Ativo. Se quiserem medir a triagem separadamente, configurem o bot para mover os leads por essa etapa."
+        "Nenhum lead passou pela etapa TRIAGEM E QUALIFICA\xC7\xC3O neste per\xEDodo. O painel j\xE1 est\xE1 pronto: assim que o agente SDR iniciar o atendimento nessa etapa, as m\xE9tricas aparecem aqui automaticamente (atualiza\xE7\xE3o a cada 30 min)."
       ),
+    React.createElement(
+      "div",
+      {
+        style: {
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+          gap: 10,
+          marginBottom: 14,
+        },
+      },
+      React.createElement(Kpi, { label: "Leads recebidos na triagem", value: num(recebidos), accent: T.gold }),
+      React.createElement(Kpi, { label: "Na fila do agente agora", value: num(fila), accent: T.steel }),
+      React.createElement(Kpi, { label: "Matr\xEDculas diretas do SDR", value: num(diretas), accent: T.green }),
+      React.createElement(Kpi, { label: "Receita direta do SDR", value: brl(recDireta), accent: T.green }),
+      React.createElement(Kpi, { label: "Enviados p/ atend. humano", value: num(handoff), accent: T.steel }),
+      React.createElement(Kpi, { label: "Convertidos p\xF3s-handoff", value: num(convHum), accent: T.green }),
+      React.createElement(Kpi, { label: "Sem resposta", value: num(semResp), accent: T.amber }),
+      React.createElement(Kpi, { label: "Matr\xEDculas perdidas", value: num(perdas), accent: T.red }),
+      React.createElement(Kpi, {
+        label: "Convers\xE3o direta",
+        value: pct(processados > 0 ? diretas / processados : null),
+        accent: T.gold,
+      }),
+      React.createElement(Kpi, {
+        label: "Taxa de handoff",
+        value: pct(processados > 0 ? handoff / processados : null),
+        accent: T.steel,
+      })
+    ),
     React.createElement(
       "div",
       {
@@ -106,7 +137,7 @@ const{useState,useMemo,useEffect}=React,{BarChart,Bar,XAxis,YAxis,Tooltip,Respon
       },
       React.createElement(
         Panel,
-        { title: "Atividade di\xE1ria do agente SDR" },
+        { title: "Atividade di\xE1ria na triagem \u2014 entradas x sa\xEDdas" },
         React.createElement(
           ResponsiveContainer,
           { width: "100%", height: 240 },
@@ -120,17 +151,25 @@ const{useState,useMemo,useEffect}=React,{BarChart,Bar,XAxis,YAxis,Tooltip,Respon
             React.createElement(Legend, { wrapperStyle: { fontSize: 11 } }),
             React.createElement(Line, {
               type: "monotone",
-              dataKey: "leads",
-              name: "Leads tocados",
+              dataKey: "entradas",
+              name: "Entradas na triagem",
               stroke: T.gold,
               strokeWidth: 2,
               dot: !1,
             }),
             React.createElement(Line, {
               type: "monotone",
-              dataKey: "handoffs",
+              dataKey: "humano",
               name: "Envios p/ humano",
               stroke: T.steel,
+              strokeWidth: 2,
+              dot: !1,
+            }),
+            React.createElement(Line, {
+              type: "monotone",
+              dataKey: "diretas",
+              name: "Matr\xEDculas diretas",
+              stroke: T.green,
               strokeWidth: 2,
               dot: !1,
             }),
@@ -147,7 +186,7 @@ const{useState,useMemo,useEffect}=React,{BarChart,Bar,XAxis,YAxis,Tooltip,Respon
       ),
       React.createElement(
         Panel,
-        { title: "Para onde o SDR envia os leads" },
+        { title: "Destinos das sa\xEDdas da triagem" },
         React.createElement(
           ResponsiveContainer,
           { width: "100%", height: 240 },
@@ -163,14 +202,14 @@ const{useState,useMemo,useEffect}=React,{BarChart,Bar,XAxis,YAxis,Tooltip,Respon
               width: 130,
             }),
             React.createElement(Tooltip, {}),
-            React.createElement(Bar, { dataKey: "movs", name: "Movimenta\xE7\xF5es", fill: T.steel, radius: [0, 4, 4, 0] })
+            React.createElement(Bar, { dataKey: "movs", name: "Leads", fill: T.steel, radius: [0, 4, 4, 0] })
           )
         )
       )
     ),
     React.createElement(
       Panel,
-      { title: "Desempenho do agente SDR por escola" },
+      { title: "Desempenho do agente SDR por escola \u2014 etapa Triagem e Qualifica\xE7\xE3o" },
       React.createElement(DataTable, { columns: cols, rows: y, pageSize: 10 })
     )
   );
