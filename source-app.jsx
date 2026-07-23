@@ -944,10 +944,10 @@ function AbaVendedores({ data, schools }) {
   const rows0 = data.vendedores
     .filter((v) => schools.includes(v.school))
     .map((v) => ({ ...v, conversao: v.leads_atribuidos > 0 ? v.matriculas / v.leads_atribuidos : 0 }));
-  const nomes = [...new Set(rows0.filter((v) => !ehGenerico(v)).map((v) => v.vendedor))].sort();
   // contas administrativas: não são vendedores, ficam fora de rankings e médias
   const ADMINS = ["LORENA CHAVES", "INEPROTEC", "MATRICULA EAD", "MATRÍCULA EAD", "(SEM RESPONSÁVEL)"];
   const ehGenerico = (v) => v.generico || ADMINS.includes(String(v.vendedor).trim().toUpperCase());
+  const nomes = [...new Set(rows0.filter((v) => !ehGenerico(v)).map((v) => v.vendedor))].sort();
   const rowsHumanos = rows0.filter((v) => !ehGenerico(v));
   const rowsGenericos = rows0.filter(ehGenerico);
   const rows = selVend === "todos" ? rowsHumanos : rowsHumanos.filter((v) => v.vendedor === selVend);
@@ -1364,26 +1364,6 @@ function AbaOrigem({ data, extra, reg, schools }) {
       </Panel>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 14 }}>
-        <Panel title="Matrículas por campanha (utm_campaign)">
-          {campanhasReais.length ? (
-            <DataTable
-              columns={[
-                { key: "school", label: "Escola", render: (r) => <SchoolTag school={r.school} /> },
-                { key: "campanha", label: "Campanha" },
-                { key: "leads", label: "Leads" },
-                { key: "matriculas", label: "Matrículas" },
-              ]}
-              rows={campanhasReais}
-              initialSort={{ key: "leads", dir: "desc" }}
-              pageSize={6}
-            />
-          ) : (
-            <Placeholder label="Atribuição de campanha indisponível" detail={campanhasQuebradas.length ? `Detectados ${sum(campanhasQuebradas, "leads")} leads com UTM literal "{campaignname}" — o macro do Meta não está sendo substituído no anúncio. Corrigir o parâmetro de URL na captação (Kwid) para ativar este bloco.` : "Apenas 0,1% dos leads têm utm_campaign preenchida. Configurar UTMs nos anúncios + gravação no Kwid para ativar este bloco."} />
-          )}
-        </Panel>
-        <Panel title="Matrículas por canal (Duotalk, WhatsApp, formulário…)">
-          <Placeholder label='Campo "Canal" não configurado no Kommo' detail="O checklist da especificação (seção 3) prevê um campo customizado de Canal no lead. Assim que for criado e preenchido na entrada, este bloco liga sozinho — sem mudança de código." />
-        </Panel>
       </div>
     </div>
   );
