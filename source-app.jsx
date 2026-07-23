@@ -690,7 +690,9 @@ function AbaFunilPerdas({ data, schools }) {
                 <YAxis stroke={T.muted} fontSize={10} tickLine={false} axisLine={false} allowDecimals={false} />
                 <Tooltip content={<ChartTip />} cursor={{ fill: "#00000006" }} />
                 {schools.map((s) => (
-                  <Bar key={s} dataKey={s} name={SCHOOLS[s].label} fill={SCHOOLS[s].color} radius={[4, 4, 0, 0]} maxBarSize={38} />
+                  <Bar key={s} dataKey={s} name={SCHOOLS[s].label} fill={SCHOOLS[s].color} radius={[4, 4, 0, 0]} maxBarSize={38}>
+                    <LabelList dataKey={s} position="top" fill={T.text} fontSize={10} formatter={(v) => (v > 0 ? v : "")} />
+                  </Bar>
                 ))}
               </BarChart>
             </ResponsiveContainer>
@@ -1125,7 +1127,8 @@ function AbaVendedores({ data, schools }) {
 }
 
 // ── Aba 4: Origem, Canal e Região ──
-function AbaOrigem({ data, extra, schools }) {
+function AbaOrigem({ data, extra, reg, schools }) {
+  const [ufSel, setUfSel] = useState(null);
   const origensRows = data.origens.filter((o) => schools.includes(o.school))
     .map((o) => ({ ...o, conversao: o.leads > 0 ? o.matriculas / o.leads : 0 }));
 
@@ -1227,13 +1230,89 @@ function AbaOrigem({ data, extra, schools }) {
                 <YAxis stroke={T.muted} fontSize={10} tickLine={false} axisLine={false} allowDecimals={false} />
                 <Tooltip content={<ChartTip />} cursor={{ fill: "#00000006" }} />
                 {schools.map((s) => (
-                  <Bar key={s} dataKey={s} name={SCHOOLS[s].label} fill={SCHOOLS[s].color} radius={[4, 4, 0, 0]} maxBarSize={30} />
+                  <Bar key={s} dataKey={s} name={SCHOOLS[s].label} fill={SCHOOLS[s].color} radius={[4, 4, 0, 0]} maxBarSize={30}>
+                    <LabelList dataKey={s} position="top" fill={T.text} fontSize={10} formatter={(v) => (v > 0 ? v : "")} />
+                  </Bar>
                 ))}
               </BarChart>
             </ResponsiveContainer>
           </div>
         ) : <Placeholder label="Sem dados de região" detail="A extração de DDD depende da sincronização de contatos, que está em andamento — a cobertura cresce a cada hora." />}
         <div style={{ fontSize: 11, color: T.muted, marginTop: 6 }}>Cobertura parcial: contatos ainda em sincronização — os números crescem conforme a base completa.</div>
+      </Panel>
+
+      <Panel title="Ranking de estados — quem mais entra e quem mais fecha">
+        {reg && reg.estados.filter((e) => schools.includes(e.school)).length ? (() => {
+          const base = reg.estados.filter((e) => schools.includes(e.school));
+          const ufs = [...new Set(base.map((e) => e.estado_uf))].map((uf) => {
+            const rs = base.filter((e) => e.estado_uf === uf);
+            const leads = sum(rs, "leads"), matr = sum(rs, "matriculas"), rec = sum(rs, "receita");
+            return { uf, leads, matriculas: matr, receita: rec, conversao: leads > 0 ? matr / leads : 0 };
+          }).sort((a, b) => b.matriculas - a.matriculas || b.leads - a.leads);
+          return (
+            <>
+              <DataTable
+                columns={[
+                  { key: "uf", label: "Estado", style: { fontWeight: 600 } },
+                  { key: "leads", label: "Leads que entraram", render: (r) => num(r.leads) },
+                  { key: "matriculas", label: "Matrículas", render: (r) => num(r.matriculas) },
+                  { key: "conversao", label: "Conversão", render: (r) => pct(r.conversao) },
+                  { key: "receita", label: "Receita", render: (r) => brl(r.receita) },
+                ]}
+                rows={ufs}
+                initialSort={{ key: "matriculas", dir: "desc" }}
+                pageSize={12}
+              />
+              <div style={{ fontSize: 11.5, color: T.muted, marginTop: 8 }}>Coorte do período: leads que entraram na janela filtrada e quantos deles já viraram matrícula. Estado identificado pelo DDD do telefone do contato.</div>
+            </>
+          );
+        })() : <Placeholder label="Sem leads com estado identificado no período" detail="Depende do telefone do contato sincronizado — a cobertura cresce a cada hora." />}
+      </Panel>
+
+      <Panel title="Cursos por estado — selecione o estado">
+        {reg && reg.cursos_por_uf.filter((c) => schools.includes(c.school)).length ? (() => {
+          const base = reg.cursos_por_uf.filter((c) => schools.includes(c.school));
+          const ufs = [...new Set(base.map((c) => c.estado_uf))]
+            .map((uf) => ({ uf, leads: sum(base.filter((c) => c.estado_uf === uf), "leads") }))
+            .sort((a, b) => b.leads - a.leads);
+          const uf = ufSel && ufs.some((u) => u.uf === ufSel) ? ufSel : ufs[0].uf;
+          const doUf = base.filter((c) => c.estado_uf === uf);
+          const nomes = [...new Set(doUf.map((c) => c.curso))];
+          const linhas = nomes.map((nome) => {
+            const rs = doUf.filter((c) => c.curso === nome);
+            const leads = sum(rs, "leads"), matr = sum(rs, "matriculas"), rec = sum(rs, "receita");
+            return { curso: nome, school: rs[0].school, leads, matriculas: matr, receita: rec, conversao: leads > 0 ? matr / leads : 0 };
+          }).sort((a, b) => b.leads - a.leads);
+          const totLeads = sum(linhas, "leads"), totMatr = sum(linhas, "matriculas"), totRec = sum(linhas, "receita");
+          return (
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+                <span style={{ fontSize: 11.5, color: T.muted }}>Estado</span>
+                <select value={uf} onChange={(e) => setUfSel(e.target.value)}
+                  style={{ background: T.panel, color: T.text, border: `1px solid ${T.border}`, borderRadius: 8, padding: "6px 10px", fontSize: 12.5, fontFamily: font, cursor: "pointer" }}>
+                  {ufs.map((u) => <option key={u.uf} value={u.uf}>{u.uf} ({u.leads} leads)</option>)}
+                </select>
+                <span style={{ fontSize: 11.5, color: T.muted }}>
+                  {num(totLeads)} leads · {num(totMatr)} matrículas · {pct(totLeads > 0 ? totMatr / totLeads : null)} · {brl(totRec)}
+                </span>
+              </div>
+              <DataTable
+                columns={[
+                  { key: "school", label: "Escola", render: (r) => <SchoolTag school={r.school} /> },
+                  { key: "curso", label: "Curso", style: { whiteSpace: "normal", minWidth: 190 } },
+                  { key: "leads", label: "Leads", render: (r) => num(r.leads) },
+                  { key: "matriculas", label: "Matrículas", render: (r) => num(r.matriculas) },
+                  { key: "conversao", label: "Conversão", render: (r) => pct(r.conversao) },
+                  { key: "receita", label: "Faturamento", render: (r) => brl(r.receita) },
+                ]}
+                rows={linhas}
+                initialSort={{ key: "leads", dir: "desc" }}
+                pageSize={10}
+              />
+              <div style={{ fontSize: 11.5, color: T.muted, marginTop: 8 }}>Interesse declarado no cartão do lead (até 3 cursos por lead; a receita é rateada entre eles). Mostra onde vale abrir turma ou concentrar mídia por região.</div>
+            </>
+          );
+        })() : <Placeholder label="Sem cursos com estado identificado no período" />}
       </Panel>
 
       <Panel title="Matrículas por estado (via DDD do telefone) — top 10">
@@ -1250,7 +1329,11 @@ function AbaOrigem({ data, extra, schools }) {
                 <XAxis dataKey="uf" stroke={T.muted} fontSize={11} tickLine={false} axisLine={false} />
                 <YAxis stroke={T.muted} fontSize={10} tickLine={false} axisLine={false} allowDecimals={false} />
                 <Tooltip content={<ChartTip />} cursor={{ fill: "#00000006" }} />
-                {schools.map((s) => <Bar key={s} dataKey={s} name={SCHOOLS[s].label} fill={SCHOOLS[s].color} radius={[4, 4, 0, 0]} maxBarSize={30} />)}
+                {schools.map((s) => (
+                  <Bar key={s} dataKey={s} name={SCHOOLS[s].label} fill={SCHOOLS[s].color} radius={[4, 4, 0, 0]} maxBarSize={30}>
+                    <LabelList dataKey={s} position="top" fill={T.text} fontSize={10} formatter={(v) => (v > 0 ? v : "")} />
+                  </Bar>
+                ))}
               </BarChart>
             </ResponsiveContainer>
           </div>;
@@ -2228,6 +2311,7 @@ export default function DashboardEdilvo() {
   const [fresh, setFresh] = useState(null);
   const [qual, setQual] = useState(null);
   const [fila, setFila] = useState(null);
+  const [reg, setReg] = useState(null);
   const [data, setData] = useState(LIVE ? null : SNAPSHOT);
   const [mkt, setMkt] = useState(null);
   const [extra, setExtra] = useState(null);
@@ -2263,9 +2347,10 @@ export default function DashboardEdilvo() {
       rpc("dashboard_jornada", { p_token: RPC_TOKEN, p_from: from, p_to: to }),
       rpc("dashboard_qualidade", { p_token: RPC_TOKEN, p_from: from, p_to: to }),
       rpc("dashboard_fila", { p_token: RPC_TOKEN, p_from: from, p_to: to }),
+      rpc("dashboard_regiao_curso", { p_token: RPC_TOKEN, p_from: from, p_to: to }),
     ])
-      .then(([j, m, x, w, s, jo, q, fl]) => {
-        setQual(q); setFila(fl);
+      .then(([j, m, x, w, s, jo, q, fl, rg]) => {
+        setQual(q); setFila(fl); setReg(rg);
         if (w) { j = { ...j, vendedores: w.vendedores, cursos: w.cursos, faixas: w.faixas }; }
         setData(j); setMkt(m); setExtra(x); setSdr(s); setJor(jo); setLoading(false);
       })
@@ -2387,7 +2472,7 @@ export default function DashboardEdilvo() {
                     {aba === "visao" && <AbaVisaoGeral data={data} extra={extra} qual={qual} fila={fila} schools={schools} />}
                     {aba === "funil" && <AbaFunilPerdas data={data} schools={schools} />}
                     {aba === "vendedores" && <AbaVendedores data={data} schools={schools} />}
-                    {aba === "origem" && <AbaOrigem data={data} extra={extra} schools={schools} />}
+                    {aba === "origem" && <AbaOrigem data={data} extra={extra} reg={reg} schools={schools} />}
                     {aba === "financeiro" && <AbaFinanceiro data={data} schools={schools} />}
                     {aba === "metas" && <AbaMetas data={data} periodoFrom={periodoAtualFrom} onSaved={() => setReload((r) => r + 1)} />}
                     {aba === "sdr" && <AbaSDR sdr={sdr} schools={schools} />}
