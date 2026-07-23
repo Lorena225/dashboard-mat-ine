@@ -1865,7 +1865,7 @@ function MenuHome({ data, mkt, extra, qual, schools, goTo }) {
 // ═══════════════════════════════════════════════════════════════════
 
 const MENUS = [
-  { id: "home", label: "Home Executivo", ready: true },
+  { id: "home", label: "Dashboard", ready: true },
   { id: "comercial", label: "Comercial", ready: true },
   { id: "marketing", label: "Marketing", ready: true },
 ];
@@ -2041,14 +2041,15 @@ export default function DashboardEdilvo() {
         {/* ───── CONTEÚDO ───── */}
         <div className="content">
           <div style={{ borderBottom: `1px solid ${T.border}`, padding: "12px 18px", background: T.bg, position: "sticky", top: 0, zIndex: 20, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-            <div style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center" }}>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
               <span style={{ fontSize: 11, color: T.muted, marginRight: 2 }}>Período</span>
-              {PERIODOS.map((p) => (
-                <button key={p.id} onClick={() => setPeriodo(p.id)} style={btn(periodo === p.id)}>{p.label}</button>
-              ))}
-              <button onClick={() => setPeriodo("custom")} style={btn(periodo === "custom")}>Personalizado</button>
+              <select value={periodo} onChange={(e) => setPeriodo(e.target.value)}
+                style={{ background: T.panel, color: T.text, border: `1px solid ${T.border}`, borderRadius: 8, padding: "6px 10px", fontSize: 12.5, fontFamily: font, cursor: "pointer", minWidth: 132 }}>
+                {PERIODOS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+                <option value="custom">Período (escolher datas)</option>
+              </select>
               {periodo === "custom" && (
-                <span style={{ display: "inline-flex", gap: 5, alignItems: "center" }}>
+                <span style={{ display: "inline-flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
                   <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} style={dateInp} />
                   <span style={{ color: T.muted, fontSize: 12 }}>até</span>
                   <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} style={dateInp} />
