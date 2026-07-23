@@ -15,13 +15,13 @@ const RPC_TOKEN = "ba37d3f35fb8c1dbef36184f0c0c1afc157dde7b";
 const THEMES = {
   claro: {
     bg: "#FFFFFF", panel: "#FFFFFF", panelSoft: "#F6F6F5", border: "#E4E4E2",
-    text: "#111111", muted: "#6E6E6A", gold: "#B08D3E", steel: "#2E7D95",
+    text: "#111111", muted: "#6E6E6A", gold: "#C8102E", steel: "#0B4EA2",
     green: "#1F7A3F", red: "#C0392B", amber: "#A8720A", ink: "#111111", onInk: "#FFFFFF",
     shadow: "0 1px 3px rgba(20,18,12,.06)", tint: "12", tintForte: "22",
   },
   escuro: {
     bg: "#0E0E10", panel: "#17171A", panelSoft: "#1F1F23", border: "#2C2C33",
-    text: "#ECEAE4", muted: "#9B968B", gold: "#D9B45B", steel: "#6FB5C9",
+    text: "#ECEAE4", muted: "#9B968B", gold: "#F2635F", steel: "#5AA9E6",
     green: "#5FBF77", red: "#E06C5F", amber: "#D9A05B", ink: "#ECEAE4", onInk: "#111111",
     shadow: "0 1px 3px rgba(0,0,0,.5)", tint: "1F", tintForte: "33",
   },
@@ -424,18 +424,29 @@ function AbaVisaoGeral({ data, extra, qual, fila, schools }) {
     const a = bySchool(va, school)[0] || {};
     const conv = (f.matriculas || 0) + (f.perdas || 0) > 0 ? f.matriculas / (f.matriculas + f.perdas) : null;
     const convAnt = (fa.matriculas || 0) + (fa.perdas || 0) > 0 ? fa.matriculas / (fa.matriculas + fa.perdas) : null;
+    const convLeads = v.leads > 0 ? (v.matriculas_criadas || 0) / v.leads : null;
+    const convLeadsAnt = a.leads > 0 ? (a.matriculas_criadas || 0) / a.leads : null;
     const c = SCHOOLS[school].color;
     return (
       <div key={school} style={{ marginBottom: 14 }}>
         <div style={{ marginBottom: 8 }}><SchoolTag school={school} /></div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(148px, 1fr))", gap: 10 }}>
-          <Kpi accent={c} label="Leads entrados" value={num(v.leads)} delta={deltaPct(v.leads, a.leads)} />
-          <Kpi accent={c} label="Matrículas" value={num(f.matriculas)} delta={deltaPct(f.matriculas, fa.matriculas)} />
-          <Kpi accent={c} label="Perdas" value={num(f.perdas)} delta={deltaPct(f.perdas, fa.perdas)} invert />
-          <Kpi accent={c} label="Em aberto" value={num(v.em_aberto)} />
-          <Kpi accent={c} label="Conversão" value={pct(conv)} delta={conv != null && convAnt != null ? conv - convAnt : null} />
-          <Kpi accent={c} label="Faturamento" value={brl(f.faturamento)} delta={deltaPct(f.faturamento, fa.faturamento)} />
-          <Kpi accent={c} label="Ticket médio" value={brl(f.ticket_medio)} />
+          <Kpi accent={c} label="Leads entrados" value={num(v.leads)} delta={deltaPct(v.leads, a.leads)}
+            title="Leads criados no Kommo dentro do período filtrado, independentemente do que aconteceu com eles depois." />
+          <Kpi accent={c} label="Matrículas" value={num(f.matriculas)} delta={deltaPct(f.matriculas, fa.matriculas)}
+            title="Leads que entraram na etapa MATRÍCULA REALIZADA dentro do período. O lead pode ter sido criado antes — aqui conta a data do fechamento." />
+          <Kpi accent={c} label="Perdas" value={num(f.perdas)} delta={deltaPct(f.perdas, fa.perdas)} invert
+            title="Leads marcados como MATRÍCULA PERDIDA dentro do período, pela data da perda." />
+          <Kpi accent={c} label="Em aberto" value={num(v.em_aberto)}
+            title="Dos leads criados no período, quantos ainda estão em negociação — nem ganhos nem perdidos." />
+          <Kpi accent={c} label="Conversão de leads" value={pct(convLeads)} delta={convLeads != null && convLeadsAnt != null ? convLeads - convLeadsAnt : null}
+            title="Dos leads que ENTRARAM no período, quantos já viraram matrícula. É a taxa comercial no sentido comum — tende a ser baixa porque parte dos leads ainda está em negociação e vai converter depois." />
+          <Kpi accent={c} label="Aproveitamento (decididos)" value={pct(conv)} delta={conv != null && convAnt != null ? conv - convAnt : null}
+            title="Entre os leads DECIDIDOS no período (matrículas + perdas fechadas), quantos viraram matrícula. Ignora quem ainda está em aberto, por isso é sempre maior que a conversão de leads. Serve para medir a qualidade do fechamento, não o volume de entrada." />
+          <Kpi accent={c} label="Faturamento" value={brl(f.faturamento)} delta={deltaPct(f.faturamento, fa.faturamento)}
+            title="Soma do valor das matrículas fechadas no período, conforme o campo de valor do lead no Kommo." />
+          <Kpi accent={c} label="Ticket médio" value={brl(f.ticket_medio)}
+            title="Faturamento dividido pelo número de matrículas fechadas no período." />
         </div>
       </div>
     );
@@ -654,7 +665,7 @@ function AbaVisaoGeral({ data, extra, qual, fila, schools }) {
                     <td style={{ fontSize: 10.5, color: T.muted, padding: 4, whiteSpace: "nowrap" }}>{t}</td>
                     {dias.map((_, d) => { const v = cell(d, t); return (
                       <td key={d} style={{ padding: 3, textAlign: "center" }}>
-                        <div style={{ background: v ? `rgba(176,141,62,${0.12 + 0.7 * v / max})` : T.panelSoft, borderRadius: 5, padding: "7px 0", fontSize: 11, fontVariantNumeric: "tabular-nums", color: v / max > 0.55 ? "#fff" : T.text }}>{v || ""}</div>
+                        <div style={{ background: v ? `rgba(11,78,162,${0.12 + 0.7 * v / max})` : T.panelSoft, borderRadius: 5, padding: "7px 0", fontSize: 11, fontVariantNumeric: "tabular-nums", color: v / max > 0.55 ? "#fff" : T.text }}>{v || ""}</div>
                       </td>); })}
                   </tr>)}</tbody>
                 </table>
@@ -1094,7 +1105,7 @@ function AbaVendedores({ data, schools }) {
                     <span style={{ fontSize: 14, width: 28, textAlign: "center" }}>{medalha(i)}</span>
                     <span style={{ fontSize: 12.5, fontWeight: i < 3 ? 600 : 400, minWidth: 140, flexShrink: 0 }}>{v.vendedor}</span>
                     <div style={{ flex: 1, height: 8, background: T.panelSoft, borderRadius: 4, overflow: "hidden", minWidth: 60 }}>
-                      <div style={{ width: `${Math.max(2, (Number(v[chaveOrd]) || 0) / maxRef * 100)}%`, height: "100%", background: i === 0 ? T.green : T.gold, borderRadius: 4 }} />
+                      <div style={{ width: `${Math.max(2, (Number(v[chaveOrd]) || 0) / maxRef * 100)}%`, height: "100%", background: i === 0 ? T.green : T.steel, borderRadius: 4 }} />
                     </div>
                     <span style={{ fontSize: 12.5, fontWeight: 600, minWidth: 92, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmt(v)}</span>
                     <span style={{ fontSize: 11, color: T.muted, minWidth: 130, textAlign: "right" }}>
@@ -2451,6 +2462,8 @@ export default function DashboardEdilvo() {
     try { return window.localStorage.getItem("edilvo_tema") || "claro"; } catch (e) { return "claro"; }
   });
   Object.assign(T, THEMES[tema] || THEMES.claro);
+  SCHOOLS.matricula_ead.color = T.gold;
+  SCHOOLS.ineprotec.color = T.steel;
   useEffect(() => {
     try { window.localStorage.setItem("edilvo_tema", tema); } catch (e) {}
     document.body.style.background = T.bg;
