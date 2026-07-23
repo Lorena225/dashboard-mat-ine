@@ -649,6 +649,9 @@ function AbaVisaoGeral({ data, extra, qual, fila, schools }) {
 
 // ── Aba 2: Funil & Perdas ──
 function AbaFunilPerdas({ data, schools }) {
+  const [catSel, setCatSel] = useState(null);
+  const [etapaSel, setEtapaSel] = useState(null);
+  const [motivoSel, setMotivoSel] = useState(null);
   const categorias = ["Sumiu / não engajou", "Sem interesse real", "Preço / concorrência", "Lead de baixa qualidade", "Outros"];
   const catData = categorias.map((cat) => {
     const row = { categoria: cat.replace(" / ", "/") };
@@ -661,7 +664,7 @@ function AbaFunilPerdas({ data, schools }) {
   const motivosCols = [
     { key: "school", label: "Escola", render: (r) => <SchoolTag school={r.school} /> },
     { key: "motivo", label: "Motivo", style: { whiteSpace: "normal", minWidth: 180 } },
-    { key: "categoria", label: "Categoria macro" },
+    { key: "categoria", label: "Categoria de objeção" },
     { key: "qtd", label: "Perdas" },
   ];
 
@@ -677,7 +680,7 @@ function AbaFunilPerdas({ data, schools }) {
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
-      <Panel title="Perdas por categoria macro (período)">
+      <Panel title="Perdas por Categoria de Objeções">
         {catData.length ? (
           <div style={{ width: "100%", height: 230 }}>
             <ResponsiveContainer>
@@ -695,7 +698,155 @@ function AbaFunilPerdas({ data, schools }) {
         ) : <Placeholder label="Sem perdas registradas no período" />}
       </Panel>
 
-      <Panel title="Ranking de motivos de perda (detalhado)">
+      <Panel title="Objeções por categoria — selecione uma categoria">
+        {(() => {
+          const base = data.motivos_perda.filter((m) => schools.includes(m.school));
+          const cats = categorias.filter((c) => base.some((m) => m.categoria === c && m.qtd > 0));
+          if (!cats.length) return <Placeholder label="Sem perdas com motivo registrado no período" />;
+          const cat = catSel && cats.includes(catSel) ? catSel : cats[0];
+          const doCat = base.filter((m) => m.categoria === cat);
+          const nomes = [...new Set(doCat.map((m) => m.motivo))];
+          const chart = nomes.map((nome) => {
+            const row = { motivo: nome.length > 34 ? nome.slice(0, 33) + "…" : nome };
+            schools.forEach((s) => { row[s] = sum(doCat.filter((m) => m.motivo === nome && m.school === s), "qtd"); });
+            row._t = schools.reduce((a, s) => a + row[s], 0);
+            return row;
+          }).sort((a, b) => b._t - a._t).slice(0, 12);
+          const totalCat = doCat.reduce((a, m) => a + Number(m.qtd), 0);
+          return (
+            <>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
+                {cats.map((c) => {
+                  const ativo = c === cat;
+                  const qtd = base.filter((m) => m.categoria === c).reduce((a, m) => a + Number(m.qtd), 0);
+                  return (
+                    <button key={c} onClick={() => setCatSel(c)}
+                      style={{ background: ativo ? T.ink : "transparent", color: ativo ? T.onInk : T.ink,
+                        border: `1px solid ${ativo ? T.ink : T.border}`, borderRadius: 8, padding: "6px 12px",
+                        fontSize: 12, fontWeight: ativo ? 600 : 400, cursor: "pointer", fontFamily: font }}>
+                      {c} · {num(qtd)}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ width: "100%", height: Math.max(170, chart.length * 34 + 30) }}>
+                <ResponsiveContainer>
+                  <BarChart data={chart} layout="vertical" margin={{ top: 0, right: 34, left: 10, bottom: 0 }} barGap={2}>
+                    <XAxis type="number" stroke={T.muted} fontSize={10} tickLine={false} axisLine={false} allowDecimals={false} />
+                    <YAxis type="category" dataKey="motivo" stroke={T.muted} fontSize={10.5} width={230} tickLine={false} axisLine={false} />
+                    <Tooltip content={<ChartTip />} cursor={{ fill: "#00000006" }} />
+                    {schools.map((s) => (
+                      <Bar key={s} dataKey={s} name={SCHOOLS[s].label} fill={SCHOOLS[s].color} radius={[0, 4, 4, 0]} maxBarSize={15}>
+                        <LabelList dataKey={s} position="right" fill={T.muted} fontSize={10} />
+                      </Bar>
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div style={{ fontSize: 11.5, color: T.muted, marginTop: 8 }}>{num(totalCat)} perdas na categoria "{cat}" no período, detalhadas por objeção declarada pelo vendedor no Kommo.</div>
+            </>
+          );
+        })()}
+      </Panel>
+
+      <Panel title="Ranking de motivos por etapa — selecione a etapa">
+        {(() => {
+          const base = heat.filter((h) => schools.includes(h.school));
+          if (!base.length) return <Placeholder label="Sem histórico de etapa da perda no período" detail="A etapa em que o lead foi perdido vem do histórico de mudanças de status (webhook), coletado desde 14/07/2026." />;
+          const etapas = [...new Set(base.map((h) => h.etapa))]
+            .map((e) => ({ etapa: e, qtd: base.filter((h) => h.etapa === e).reduce((a, h) => a + Number(h.qtd), 0) }))
+            .sort((a, b) => b.qtd - a.qtd);
+          const etapa = etapaSel && etapas.some((e) => e.etapa === etapaSel) ? etapaSel : etapas[0].etapa;
+          const daEtapa = base.filter((h) => h.etapa === etapa);
+          const nomes = [...new Set(daEtapa.map((h) => h.motivo))];
+          const chart = nomes.map((nome) => {
+            const row = { motivo: nome.length > 34 ? nome.slice(0, 33) + "…" : nome };
+            schools.forEach((s) => { row[s] = sum(daEtapa.filter((h) => h.motivo === nome && h.school === s), "qtd"); });
+            row._t = schools.reduce((a, s) => a + row[s], 0);
+            return row;
+          }).sort((a, b) => b._t - a._t).slice(0, 12);
+          return (
+            <>
+              <div style={{ marginBottom: 14, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 11.5, color: T.muted }}>Etapa da perda</span>
+                <select value={etapa} onChange={(e) => setEtapaSel(e.target.value)}
+                  style={{ background: T.panel, color: T.text, border: `1px solid ${T.border}`, borderRadius: 8, padding: "6px 10px", fontSize: 12.5, fontFamily: font, cursor: "pointer", maxWidth: 320 }}>
+                  {etapas.map((e) => <option key={e.etapa} value={e.etapa}>{e.etapa} ({e.qtd})</option>)}
+                </select>
+              </div>
+              <div style={{ width: "100%", height: Math.max(170, chart.length * 34 + 30) }}>
+                <ResponsiveContainer>
+                  <BarChart data={chart} layout="vertical" margin={{ top: 0, right: 34, left: 10, bottom: 0 }} barGap={2}>
+                    <XAxis type="number" stroke={T.muted} fontSize={10} tickLine={false} axisLine={false} allowDecimals={false} />
+                    <YAxis type="category" dataKey="motivo" stroke={T.muted} fontSize={10.5} width={230} tickLine={false} axisLine={false} />
+                    <Tooltip content={<ChartTip />} cursor={{ fill: "#00000006" }} />
+                    {schools.map((s) => (
+                      <Bar key={s} dataKey={s} name={SCHOOLS[s].label} fill={SCHOOLS[s].color} radius={[0, 4, 4, 0]} maxBarSize={15}>
+                        <LabelList dataKey={s} position="right" fill={T.muted} fontSize={10} />
+                      </Bar>
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div style={{ fontSize: 11.5, color: T.muted, marginTop: 8 }}>Por que os leads são perdidos nesta etapa específica do funil — útil para treinar a abordagem certa em cada momento da negociação.</div>
+            </>
+          );
+        })()}
+      </Panel>
+
+      <Panel title="Em que etapa cada motivo derruba mais — selecione o motivo">
+        {(() => {
+          const base = heat.filter((h) => schools.includes(h.school));
+          if (!base.length) return <Placeholder label="Sem histórico de etapa da perda no período" detail="Depende do histórico de mudanças de status, em coleta desde 14/07/2026." />;
+          const motivos = [...new Set(base.map((h) => h.motivo))]
+            .map((m) => ({ motivo: m, qtd: base.filter((h) => h.motivo === m).reduce((a, h) => a + Number(h.qtd), 0) }))
+            .sort((a, b) => b.qtd - a.qtd).slice(0, 10);
+          const motivo = motivoSel && motivos.some((m) => m.motivo === motivoSel) ? motivoSel : motivos[0].motivo;
+          const doMotivo = base.filter((h) => h.motivo === motivo);
+          const nomes = [...new Set(doMotivo.map((h) => h.etapa))];
+          const chart = nomes.map((nome) => {
+            const row = { etapa: nome.length > 30 ? nome.slice(0, 29) + "…" : nome };
+            schools.forEach((s) => { row[s] = sum(doMotivo.filter((h) => h.etapa === nome && h.school === s), "qtd"); });
+            row._t = schools.reduce((a, s) => a + row[s], 0);
+            return row;
+          }).sort((a, b) => b._t - a._t);
+          return (
+            <>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
+                {motivos.map((m) => {
+                  const ativo = m.motivo === motivo;
+                  const curto = m.motivo.length > 28 ? m.motivo.slice(0, 27) + "…" : m.motivo;
+                  return (
+                    <button key={m.motivo} onClick={() => setMotivoSel(m.motivo)} title={m.motivo}
+                      style={{ background: ativo ? T.ink : "transparent", color: ativo ? T.onInk : T.ink,
+                        border: `1px solid ${ativo ? T.ink : T.border}`, borderRadius: 8, padding: "6px 12px",
+                        fontSize: 11.5, fontWeight: ativo ? 600 : 400, cursor: "pointer", fontFamily: font }}>
+                      {curto} · {num(m.qtd)}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ width: "100%", height: Math.max(170, chart.length * 34 + 30) }}>
+                <ResponsiveContainer>
+                  <BarChart data={chart} layout="vertical" margin={{ top: 0, right: 34, left: 10, bottom: 0 }} barGap={2}>
+                    <XAxis type="number" stroke={T.muted} fontSize={10} tickLine={false} axisLine={false} allowDecimals={false} />
+                    <YAxis type="category" dataKey="etapa" stroke={T.muted} fontSize={10.5} width={200} tickLine={false} axisLine={false} />
+                    <Tooltip content={<ChartTip />} cursor={{ fill: "#00000006" }} />
+                    {schools.map((s) => (
+                      <Bar key={s} dataKey={s} name={SCHOOLS[s].label} fill={SCHOOLS[s].color} radius={[0, 4, 4, 0]} maxBarSize={15}>
+                        <LabelList dataKey={s} position="right" fill={T.muted} fontSize={10} />
+                      </Bar>
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div style={{ fontSize: 11.5, color: T.muted, marginTop: 8 }}>Onde no funil esta objeção mais aparece: se concentra no início, é qualificação; se aparece tarde, é fechamento.</div>
+            </>
+          );
+        })()}
+      </Panel>
+
+      <Panel title="Ranking completo de motivos (tabela)">
         <DataTable columns={motivosCols} rows={data.motivos_perda.filter((m) => schools.includes(m.school))} initialSort={{ key: "qtd", dir: "desc" }} />
       </Panel>
 
