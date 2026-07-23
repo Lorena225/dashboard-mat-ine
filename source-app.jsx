@@ -943,8 +943,10 @@ function AbaVendedores({ data, schools }) {
   const rows0 = data.vendedores
     .filter((v) => schools.includes(v.school))
     .map((v) => ({ ...v, conversao: v.leads_atribuidos > 0 ? v.matriculas / v.leads_atribuidos : 0 }));
-  const nomes = [...new Set(rows0.filter((v) => !(v.generico || ["INEPROTEC", "MATRICULA EAD", "(sem responsável)"].includes(v.vendedor))).map((v) => v.vendedor))].sort();
-  const ehGenerico = (v) => v.generico || ["INEPROTEC", "MATRICULA EAD", "(sem responsável)"].includes(v.vendedor);
+  const nomes = [...new Set(rows0.filter((v) => !ehGenerico(v)).map((v) => v.vendedor))].sort();
+  // contas administrativas: não são vendedores, ficam fora de rankings e médias
+  const ADMINS = ["LORENA CHAVES", "INEPROTEC", "MATRICULA EAD", "MATRÍCULA EAD", "(SEM RESPONSÁVEL)"];
+  const ehGenerico = (v) => v.generico || ADMINS.includes(String(v.vendedor).trim().toUpperCase());
   const rowsHumanos = rows0.filter((v) => !ehGenerico(v));
   const rowsGenericos = rows0.filter(ehGenerico);
   const rows = selVend === "todos" ? rowsHumanos : rowsHumanos.filter((v) => v.vendedor === selVend);
@@ -1121,7 +1123,7 @@ function AbaVendedores({ data, schools }) {
         <DataTable columns={cols} rows={rows} initialSort={{ key: "matriculas", dir: "desc" }} />
       </Panel>
       {rowsGenericos.length > 0 && (
-        <Panel title="Contas genéricas e sem responsável (fora do ranking)">
+        <Panel title="Contas administrativas e sem responsável (fora das métricas)">
           <DataTable
             columns={[
               { key: "vendedor", label: "Conta" },
@@ -1134,7 +1136,7 @@ function AbaVendedores({ data, schools }) {
             initialSort={{ key: "leads_atribuidos", dir: "desc" }}
             pageSize={5}
           />
-          <div style={{ fontSize: 11.5, color: T.muted, marginTop: 8 }}>Contas da própria escola ou leads sem responsável atribuído. Ficam separadas para não distorcer médias e rankings, mas o volume continua visível.</div>
+          <div style={{ fontSize: 11.5, color: T.muted, marginTop: 8 }}>Contas administrativas (Lorena Chaves, INEPROTEC) e leads sem responsável atribuído. Ficam fora do ranking consolidado e do relatório por vendedor para não distorcer médias, mas o volume permanece visível aqui.</div>
         </Panel>
       )}
 
@@ -2085,6 +2087,45 @@ function MenuMarketing({ mkt, qual, orig, schools }) {
             </>
           );
         })() : <Placeholder label="Sem leads no período" />}
+      </Panel>
+
+      <Panel title={<span>De onde vêm as matrículas<Info texto="Ranking de todas as origens que geraram matrícula no período, pagas e orgânicas. Inclui Indicação e WhatsApp direto, que não têm custo de mídia e costumam converter acima da média — acompanhá-los evita decidir orçamento olhando só para o que é pago." /></span>}>
+        {orig && orig.por_detalhe.filter((d) => schools.includes(d.school) && d.matriculas > 0).length ? (() => {
+          const base = orig.por_detalhe.filter((d) => schools.includes(d.school) && d.matriculas > 0);
+          const totMatr = sum(base, "matriculas"), totRec = sum(base, "receita");
+          const linhas = base.map((d) => ({
+            ...d,
+            rotulo: d.canal + (d.detalhe && d.detalhe !== "(sem detalhe)" && !d.canal.toUpperCase().includes(String(d.detalhe).slice(0, 6).toUpperCase()) ? " · " + d.detalhe : ""),
+            conversao: d.leads > 0 ? d.matriculas / d.leads : 0,
+            share: totMatr > 0 ? d.matriculas / totMatr : 0,
+          })).sort((a, b) => b.matriculas - a.matriculas);
+          return (
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 12 }}>
+                <Kpi accent={T.ink} label="Matrículas rastreadas" value={num(totMatr)} title="Matrículas do período cujo lead tinha o campo Origem preenchido no Kommo." />
+                <Kpi accent={T.ink} label="Receita rastreada" value={brl(totRec)} />
+                <Kpi accent={T.ink} label="Origens que converteram" value={num(linhas.length)} />
+              </div>
+              <DataTable
+                columns={[
+                  { key: "school", label: "Escola", render: (r) => <SchoolTag school={r.school} /> },
+                  { key: "rotulo", label: "Origem", style: { whiteSpace: "normal", minWidth: 190, fontWeight: 500 } },
+                  { key: "matriculas", label: "Matrículas", render: (r) => num(r.matriculas) },
+                  { key: "share", label: "% do total", render: (r) => pct(r.share) },
+                  { key: "leads", label: "Leads", render: (r) => num(r.leads) },
+                  { key: "conversao", label: "Conversão", render: (r) => <span style={{ color: r.conversao >= 0.1 ? T.green : r.conversao > 0 ? T.text : T.muted, fontWeight: r.conversao >= 0.1 ? 600 : 400 }}>{pct(r.conversao)}</span> },
+                  { key: "receita", label: "Receita", render: (r) => brl(r.receita) },
+                ]}
+                rows={linhas}
+                initialSort={{ key: "matriculas", dir: "desc" }}
+                pageSize={12}
+              />
+              <div style={{ fontSize: 11.5, color: T.muted, marginTop: 8, lineHeight: 1.6 }}>
+                Conversão em verde marca origens acima de 10%. Indicação e WhatsApp direto entram aqui em pé de igualdade com mídia paga: sem custo de anúncio, costumam ter a melhor conversão da base e merecem processo próprio (programa de indicação, tempo de resposta no WhatsApp).
+              </div>
+            </>
+          );
+        })() : <Placeholder label="Nenhuma matrícula com origem rastreada no período" />}
       </Panel>
 
       <Panel title={<span>Detalhamento por canal e criativo<Info texto="Abre cada canal no nível registrado no campo Origem do Kommo (padrão ESCOLA-CANAL-DETALHE). No Meta, o detalhe é o criativo ou a campanha (Instagram, Facebook, Técnico em Segurança do Trabalho...); no Google, o tipo de campanha (Pesquisa); no Site, a página ou formulário. Clique num canal para ver o detalhamento." /></span>}>
