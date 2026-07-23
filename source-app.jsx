@@ -12,11 +12,21 @@ const SUPABASE_URL = "https://svmxlhhsgvbhjpcdhnhy.supabase.co";
 const RPC_TOKEN = "ba37d3f35fb8c1dbef36184f0c0c1afc157dde7b";
 
 // ── Identidade VirtruvIA ──
-const T = {
-  bg: "#FFFFFF", panel: "#FFFFFF", panelSoft: "#F6F6F5", border: "#E4E4E2",
-  text: "#111111", muted: "#6E6E6A", gold: "#B08D3E", steel: "#2E7D95",
-  green: "#1F7A3F", red: "#C0392B", amber: "#A8720A", ink: "#111111",
+const THEMES = {
+  claro: {
+    bg: "#FFFFFF", panel: "#FFFFFF", panelSoft: "#F6F6F5", border: "#E4E4E2",
+    text: "#111111", muted: "#6E6E6A", gold: "#B08D3E", steel: "#2E7D95",
+    green: "#1F7A3F", red: "#C0392B", amber: "#A8720A", ink: "#111111", onInk: "#FFFFFF",
+    shadow: "0 1px 3px rgba(20,18,12,.06)",
+  },
+  escuro: {
+    bg: "#0E0E10", panel: "#17171A", panelSoft: "#1F1F23", border: "#2C2C33",
+    text: "#ECEAE4", muted: "#9B968B", gold: "#D9B45B", steel: "#6FB5C9",
+    green: "#5FBF77", red: "#E06C5F", amber: "#D9A05B", ink: "#ECEAE4", onInk: "#111111",
+    shadow: "0 1px 3px rgba(0,0,0,.5)",
+  },
 };
+const T = { ...THEMES.claro };
 const SCHOOLS = {
   matricula_ead: { label: "Matrícula EAD", color: T.gold },
   ineprotec: { label: "Ineprotec", color: T.steel },
@@ -284,7 +294,7 @@ function SchoolTag({ school }) {
 
 function Panel({ title, right, children, style }) {
   return (
-    <div style={{ background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, padding: 16, boxShadow: "0 1px 3px rgba(33,31,27,0.05)", ...style }}>
+    <div style={{ background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, padding: 16, boxShadow: T.shadow, ...style }}>
       {(title || right) && (
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 8 }}>
           <div style={{ fontSize: 13, fontWeight: 600 }}>{title}</div>
@@ -1089,7 +1099,7 @@ function AbaMetas({ data, periodoFrom, onSaved }) {
       .catch((e) => { setSalvando(false); setMsg("Não foi possível salvar (" + e.message + ")."); });
   };
 
-  const inp = { background: "#fff", color: T.text, border: `1px solid ${T.border}`, borderRadius: 6, padding: "5px 8px", fontSize: 12.5, fontFamily: font, width: "100%" };
+  const inp = { background: T.panel, color: T.text, border: `1px solid ${T.border}`, borderRadius: 6, padding: "5px 8px", fontSize: 12.5, fontFamily: font, width: "100%" };
   const th = { textAlign: "left", padding: "6px 8px", fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".06em", color: T.muted, borderBottom: `1px solid ${T.border}` };
 
   const porPessoa = {};
@@ -1112,7 +1122,7 @@ function AbaMetas({ data, periodoFrom, onSaved }) {
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <Panel title={`Tabela de metas e premiação — ${mesRef ? mesRef.split("-").reverse().join("/") : "mês do período"}`}
-        right={<button onClick={salvar} disabled={salvando} style={{ background: T.ink, color: "#fff", border: "none", borderRadius: 8, padding: "7px 16px", fontSize: 12.5, fontWeight: 500, cursor: "pointer", fontFamily: font, opacity: salvando ? 0.5 : 1 }}>{salvando ? "Salvando…" : "Salvar metas"}</button>}>
+        right={<button onClick={salvar} disabled={salvando} style={{ background: T.ink, color: T.onInk, border: "none", borderRadius: 8, padding: "7px 16px", fontSize: 12.5, fontWeight: 500, cursor: "pointer", fontFamily: font, opacity: salvando ? 0.5 : 1 }}>{salvando ? "Salvando…" : "Salvar metas"}</button>}>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead><tr>
@@ -1896,6 +1906,15 @@ const ABAS = [
 ];
 
 export default function DashboardEdilvo() {
+  const [tema, setTema] = useState(() => {
+    try { return window.localStorage.getItem("edilvo_tema") || "claro"; } catch (e) { return "claro"; }
+  });
+  Object.assign(T, THEMES[tema] || THEMES.claro);
+  useEffect(() => {
+    try { window.localStorage.setItem("edilvo_tema", tema); } catch (e) {}
+    document.body.style.background = T.bg;
+    document.documentElement.style.colorScheme = tema === "escuro" ? "dark" : "light";
+  }, [tema]);
   const [menu, setMenu] = useState("home");
   const [periodo, setPeriodo] = useState("mes_atual");
   const [escola, setEscola] = useState("todas");
@@ -1960,22 +1979,22 @@ export default function DashboardEdilvo() {
   const rotulo = periodo === "custom" && applied ? `${applied.from.split("-").reverse().join("/")} – ${new Date(new Date(applied.to) - 86400000).toLocaleDateString("pt-BR")}` : (PERIODOS.find((p) => p.id === periodo) || {}).label;
 
   const btn = (active, color) => ({
-    background: active ? T.ink : "transparent", color: active ? "#FFFFFF" : T.ink,
+    background: active ? T.ink : "transparent", color: active ? T.onInk : T.ink,
     border: `1px solid ${active ? T.ink : T.border}`, borderRadius: 8,
     padding: "6px 12px", fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: font, whiteSpace: "nowrap",
   });
   const navItem = (active) => ({
     display: "block", width: "100%", textAlign: "left", background: active ? T.ink : "transparent",
-    color: active ? "#FFFFFF" : T.ink, border: "none", borderRadius: 8, padding: "10px 14px",
+    color: active ? T.onInk : T.ink, border: "none", borderRadius: 8, padding: "10px 14px",
     fontSize: 13, fontWeight: active ? 600 : 500, cursor: "pointer", fontFamily: font, marginBottom: 4,
   });
-  const dateInp = { background: "#fff", color: T.text, border: `1px solid ${T.border}`, borderRadius: 8, padding: "5px 8px", fontSize: 12, fontFamily: font };
+  const dateInp = { background: T.panel, color: T.text, border: `1px solid ${T.border}`, borderRadius: 8, padding: "5px 8px", fontSize: 12, fontFamily: font };
 
   return (
     <div style={{ fontFamily: font, background: T.bg, color: T.text, minHeight: "100vh" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap'); *{box-sizing:border-box} body{margin:0} img{max-width:100%}
         .layout{display:flex;min-height:100vh}
-        .sidebar{width:225px;flex-shrink:0;border-right:1px solid ${T.border};padding:18px 14px;position:sticky;top:0;height:100vh;overflow-y:auto;background:#fff;display:flex;flex-direction:column}
+        .sidebar{width:225px;flex-shrink:0;border-right:1px solid ${T.border};padding:18px 14px;position:sticky;top:0;height:100vh;overflow-y:auto;background:${T.panel};display:flex;flex-direction:column}
         .content{flex:1;min-width:0}
         @media(max-width:760px){
           .layout{display:block}
@@ -2009,12 +2028,19 @@ export default function DashboardEdilvo() {
               ))}
             </div>
           )}
-          <div style={{ marginTop: "auto", paddingTop: 14, fontSize: 11, color: T.muted }}>@AgenciaVirtruvia</div>
+          <div style={{ marginTop: "auto", paddingTop: 14, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+            <span style={{ fontSize: 11, color: T.muted }}>@AgenciaVirtruvia</span>
+            <button onClick={() => setTema(tema === "claro" ? "escuro" : "claro")}
+              title={tema === "claro" ? "Mudar para tema escuro" : "Mudar para tema claro"}
+              style={{ background: T.panelSoft, color: T.text, border: `1px solid ${T.border}`, borderRadius: 20, padding: "5px 11px", fontSize: 11.5, cursor: "pointer", fontFamily: font, whiteSpace: "nowrap" }}>
+              {tema === "claro" ? "\u25D0 Escuro" : "\u25D1 Claro"}
+            </button>
+          </div>
         </aside>
 
         {/* ───── CONTEÚDO ───── */}
         <div className="content">
-          <div style={{ borderBottom: `1px solid ${T.border}`, padding: "12px 18px", background: "#fff", position: "sticky", top: 0, zIndex: 20, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+          <div style={{ borderBottom: `1px solid ${T.border}`, padding: "12px 18px", background: T.bg, position: "sticky", top: 0, zIndex: 20, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
             <div style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center" }}>
               <span style={{ fontSize: 11, color: T.muted, marginRight: 2 }}>Período</span>
               {PERIODOS.map((p) => (
