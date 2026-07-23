@@ -930,7 +930,7 @@ function AbaOrigem({ data, extra, schools }) {
       <Panel title="Matrículas por estado (via DDD do telefone) — top 10">
         {(() => {
           const cm = {};
-          m.forEach((e) => { cm[e.estado_uf] = cm[e.estado_uf] || { uf: e.estado_uf }; cm[e.estado_uf][e.school] = (cm[e.estado_uf][e.school] || 0) + Number(e.matriculas || 0); });
+          regioesRows.forEach((e) => { cm[e.estado_uf] = cm[e.estado_uf] || { uf: e.estado_uf }; cm[e.estado_uf][e.school] = (cm[e.estado_uf][e.school] || 0) + Number(e.matriculas || 0); });
           const dataM = Object.values(cm).map((e) => ({ ...e, total: schools.reduce((a, s) => a + (e[s] || 0), 0) }))
             .filter((e) => e.total > 0).sort((a, b) => b.total - a.total).slice(0, 10);
           if (!dataM.length) return <Placeholder label="Sem matrículas com estado identificado no período" />;
