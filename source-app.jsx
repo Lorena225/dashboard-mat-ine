@@ -917,6 +917,7 @@ function AbaFunilPerdas({ data, schools }) {
 // ── Aba 3: Performance por Vendedor ──
 function AbaVendedores({ data, schools }) {
   const [selVend, setSelVend] = useState("todos");
+  const [indicador, setIndicador] = useState("todos");
   const rows0 = data.vendedores
     .filter((v) => schools.includes(v.school))
     .map((v) => ({ ...v, conversao: v.leads_atribuidos > 0 ? v.matriculas / v.leads_atribuidos : 0 }));
@@ -937,16 +938,25 @@ function AbaVendedores({ data, schools }) {
       const base = !r.faixa_nome || r.faixa_nome === "Base";
       return <span style={{ color: base ? T.muted : T.green, fontWeight: base ? 400 : 600 }}>{r.faixa_nome || "—"}{base ? "" : " ✓"}</span>;
     } },
-    { key: "falta_proxima", label: "Falta p/ próxima", render: (r) => r.falta_proxima == null ? "—" : String(Math.round(r.falta_proxima * 10) / 10).replace(".", ",") },
+    { key: "falta_proxima", label: "Falta p/ Meta", render: (r) => r.falta_proxima == null ? "—" : String(Math.round(r.falta_proxima * 10) / 10).replace(".", ",") },
     { key: "comissao", label: "Comissão", render: (r) => brl(r.comissao) },
     { key: "faturamento", label: "Faturamento", render: (r) => brl(r.faturamento) },
     { key: "ticket_medio", label: "Ticket médio", render: (r) => brl(r.ticket_medio) },
     { key: "dias_fechamento", label: "Fechamento (dias)", render: (r) => (r.dias_fechamento == null ? "—" : r.dias_fechamento.toFixed(1).replace(".", ",")) },
   ];
 
-  const chartData = schools.flatMap((s) =>
-    bySchool(rows, s).filter((v) => v.matriculas > 0).map((v) => ({ nome: v.vendedor.split(" ")[0] + ` (${SCHOOLS[s].label.slice(0, 3)})`, matriculas: v.matriculas, fill: SCHOOLS[s].color }))
-  ).sort((a, b) => b.matriculas - a.matriculas);
+  // uma barra por vendedor, empilhada pelas escolas que ele atende
+  const chartData = [...new Set(rows.filter((v) => v.matriculas > 0).map((v) => v.vendedor))]
+    .map((nome) => {
+      const row = { nome: nome.split(" ").slice(0, 2).join(" ") };
+      schools.forEach((s) => {
+        row[s] = Math.round(sum(rows.filter((v) => v.vendedor === nome && v.school === s), "matriculas") * 10) / 10;
+      });
+      row._total = Math.round(schools.reduce((a, s) => a + row[s], 0) * 10) / 10;
+      return row;
+    })
+    .filter((r) => r._total > 0)
+    .sort((a, b) => b._total - a._total);
 
   const selRows = selVend === "todos" ? [] : rows;
   const selKpi = selRows.length ? {
@@ -970,18 +980,117 @@ function AbaVendedores({ data, schools }) {
         {chartData.length ? (
           <div style={{ width: "100%", height: Math.max(160, chartData.length * 42 + 40) }}>
             <ResponsiveContainer>
-              <BarChart data={chartData} layout="vertical" margin={{ top: 0, right: 34, left: 10, bottom: 0 }}>
+              <BarChart data={chartData} layout="vertical" margin={{ top: 0, right: 48, left: 10, bottom: 0 }}>
                 <XAxis type="number" stroke={T.muted} fontSize={10} tickLine={false} axisLine={false} allowDecimals={false} />
                 <YAxis type="category" dataKey="nome" stroke={T.muted} fontSize={11} width={150} tickLine={false} axisLine={false} />
                 <Tooltip content={<ChartTip />} cursor={{ fill: "#00000006" }} />
-                <Bar dataKey="matriculas" name="Matrículas" radius={[0, 4, 4, 0]} maxBarSize={22}>
-                  <LabelList dataKey="matriculas" position="right" fill={T.text} fontSize={11} />
-                </Bar>
+                {schools.map((s, i) => (
+                  <Bar key={s} dataKey={s} name={SCHOOLS[s].label} stackId="v" fill={SCHOOLS[s].color} maxBarSize={24}
+                    radius={i === schools.length - 1 ? [0, 4, 4, 0] : [0, 0, 0, 0]}>
+                    <LabelList dataKey={s} position="center" fill="#FFFFFF" fontSize={10.5} fontWeight={600}
+                      formatter={(v) => (v > 0 ? String(v).replace(".", ",") : "")} />
+                    {i === schools.length - 1 && (
+                      <LabelList dataKey="_total" position="right" fill={T.text} fontSize={11.5} fontWeight={600}
+                        formatter={(v) => String(v).replace(".", ",")} />
+                    )}
+                  </Bar>
+                ))}
               </BarChart>
             </ResponsiveContainer>
           </div>
         ) : <Placeholder label="Sem matrículas no período" />}
+        {schools.length > 1 && <div style={{ fontSize: 11.5, color: T.muted, marginTop: 8 }}>Vendedores que atendem as duas escolas aparecem em uma única barra: cada cor é uma escola, com o número dentro do segmento, e o total à direita.</div>}
       </Panel>
+      <Panel title="Ranking consolidado de desempenho" right={
+        <select value={indicador} onChange={(e) => setIndicador(e.target.value)}
+          style={{ background: T.panel, color: T.text, border: `1px solid ${T.border}`, borderRadius: 8, padding: "6px 10px", fontSize: 12, fontFamily: font, cursor: "pointer", maxWidth: 300 }}>
+          <option value="todos">Todos os indicadores (índice ponderado)</option>
+          <option value="matriculas">Matrículas efetivadas</option>
+          <option value="faturamento">Faturamento gerado</option>
+          <option value="conversao">Taxa de conversão</option>
+          <option value="ticket_medio">Ticket médio</option>
+          <option value="velocidade">Velocidade de fechamento</option>
+          <option value="leads_atribuidos">Volume de leads atendidos</option>
+          <option value="" disabled>── Dependem de dados ainda não coletados ──</option>
+          <option value="" disabled>Tempo médio de resposta (requer Chats API)</option>
+          <option value="" disabled>Fechamento no 1º contato (requer histórico de mensagens)</option>
+          <option value="" disabled>Satisfação do lead (requer campo no Kommo)</option>
+        </select>}>
+        {(() => {
+          // consolida o vendedor entre as escolas
+          const nomesV = [...new Set(rows.map((v) => v.vendedor))];
+          const cons = nomesV.map((nome) => {
+            const rs = rows.filter((v) => v.vendedor === nome);
+            const matriculas = sum(rs, "matriculas");
+            const faturamento = sum(rs, "faturamento");
+            const leads = sum(rs, "leads_atribuidos");
+            const perdas = sum(rs, "perdas");
+            const comDias = rs.filter((r) => r.dias_fechamento != null && r.matriculas > 0);
+            const dias = comDias.length ? comDias.reduce((a, r) => a + Number(r.dias_fechamento) * Number(r.matriculas), 0) / sum(comDias, "matriculas") : null;
+            return {
+              vendedor: nome, matriculas: Math.round(matriculas * 10) / 10, faturamento, leads_atribuidos: leads, perdas,
+              conversao: leads > 0 ? matriculas / leads : 0,
+              ticket_medio: matriculas > 0 ? faturamento / matriculas : 0,
+              dias_fechamento: dias, velocidade: dias != null && dias > 0 ? 1 / dias : 0,
+              comissao: sum(rs, "comissao"),
+            };
+          }).filter((v) => v.matriculas > 0 || v.leads_atribuidos > 0);
+          if (!cons.length) return <Placeholder label="Sem atividade de vendedores no período" />;
+
+          // normaliza 0–100 e aplica pesos
+          const norm = (campo) => {
+            const vals = cons.map((v) => Number(v[campo]) || 0);
+            const mx = Math.max(...vals), mn = Math.min(...vals);
+            return (v) => (mx === mn ? (mx > 0 ? 100 : 0) : ((Number(v[campo]) || 0) - mn) / (mx - mn) * 100);
+          };
+          const pesos = [["matriculas", 0.35], ["conversao", 0.25], ["faturamento", 0.20], ["ticket_medio", 0.10], ["velocidade", 0.10]];
+          const normalizadores = Object.fromEntries(pesos.map(([c]) => [c, norm(c)]));
+          const comScore = cons.map((v) => ({ ...v, score: Math.round(pesos.reduce((a, [c, p]) => a + normalizadores[c](v) * p, 0) * 10) / 10 }));
+
+          const chaveOrd = indicador === "todos" ? "score" : indicador;
+          const ranking = [...comScore].sort((a, b) => (Number(b[chaveOrd]) || 0) - (Number(a[chaveOrd]) || 0));
+          const medalha = (i) => (i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}º`);
+          const maxRef = Math.max(...ranking.map((v) => Number(v[chaveOrd]) || 0), 1);
+          const rotulos = { todos: "Índice", matriculas: "Matrículas", faturamento: "Faturamento", conversao: "Conversão", ticket_medio: "Ticket médio", velocidade: "Velocidade", leads_atribuidos: "Leads atendidos" };
+          const fmt = (v) => {
+            const x = Number(v[chaveOrd]) || 0;
+            if (chaveOrd === "faturamento" || chaveOrd === "ticket_medio") return brl(x);
+            if (chaveOrd === "conversao") return pct(x);
+            if (chaveOrd === "velocidade") return v.dias_fechamento != null ? `${v.dias_fechamento.toFixed(1).replace(".", ",")} dias` : "—";
+            if (chaveOrd === "score") return `${String(x).replace(".", ",")} pts`;
+            return String(Math.round(x * 10) / 10).replace(".", ",");
+          };
+
+          return (
+            <>
+              <div style={{ display: "grid", gap: 8 }}>
+                {ranking.map((v, i) => (
+                  <div key={v.vendedor} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", background: i < 3 ? T.panelSoft : "transparent", border: `1px solid ${i < 3 ? T.border : "transparent"}`, borderRadius: 8 }}>
+                    <span style={{ fontSize: 14, width: 28, textAlign: "center" }}>{medalha(i)}</span>
+                    <span style={{ fontSize: 12.5, fontWeight: i < 3 ? 600 : 400, minWidth: 140, flexShrink: 0 }}>{v.vendedor}</span>
+                    <div style={{ flex: 1, height: 8, background: T.panelSoft, borderRadius: 4, overflow: "hidden", minWidth: 60 }}>
+                      <div style={{ width: `${Math.max(2, (Number(v[chaveOrd]) || 0) / maxRef * 100)}%`, height: "100%", background: i === 0 ? T.green : T.gold, borderRadius: 4 }} />
+                    </div>
+                    <span style={{ fontSize: 12.5, fontWeight: 600, minWidth: 92, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmt(v)}</span>
+                    <span style={{ fontSize: 11, color: T.muted, minWidth: 130, textAlign: "right" }}>
+                      {String(v.matriculas).replace(".", ",")} matr · {pct(v.conversao)} conv
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ fontSize: 11.5, color: T.muted, marginTop: 10, lineHeight: 1.6 }}>
+                {indicador === "todos"
+                  ? "Índice ponderado (0 a 100), calculado sobre o desempenho relativo do grupo no período: matrículas 35%, conversão 25%, faturamento 20%, ticket médio 10% e velocidade de fechamento 10%. Vendedores que atendem as duas escolas entram com os números somados."
+                  : `Ordenado por ${rotulos[chaveOrd] || chaveOrd}. Use "Todos os indicadores" para o ranking equilibrado, que evita premiar volume sem conversão ou conversão sem volume.`}
+              </div>
+              <div style={{ fontSize: 11, color: T.muted, marginTop: 6 }}>
+                Tempo de resposta, fechamento no primeiro contato e satisfação do lead aparecem desativados na lista porque dependem de dados que o Kommo ainda não entrega ao painel — entram no índice assim que forem coletados.
+              </div>
+            </>
+          );
+        })()}
+      </Panel>
+
       <Panel title="Relatório por vendedor (clique nas colunas para ordenar)" right={
         <select value={selVend} onChange={(e) => setSelVend(e.target.value)} style={{ background: T.panelSoft, color: T.text, border: `1px solid ${T.border}`, borderRadius: 8, padding: "6px 10px", fontSize: 12, fontFamily: font }}>
           <option value="todos">Todos os usuários</option>
@@ -1351,7 +1460,7 @@ function AbaMetas({ data, periodoFrom, onSaved }) {
               const base = !p.faixa_nome || p.faixa_nome === "Base";
               return <span style={{ color: base ? T.muted : T.green, fontWeight: base ? 400 : 600 }}>{p.faixa_nome || "—"}{base ? "" : " ✓"}</span>;
             } },
-            { key: "falta_proxima", label: "Falta p/ próxima", render: (p) => (p.falta_proxima == null ? "—" : d1(p.falta_proxima)) },
+            { key: "falta_proxima", label: "Falta p/ Meta", render: (p) => (p.falta_proxima == null ? "—" : d1(p.falta_proxima)) },
             { key: "boleto", label: "Boleto", render: (p) => d1(p.boleto) },
             { key: "cartao", label: "Cartão", render: (p) => d1(p.cartao) },
             { key: "pix", label: "PIX", render: (p) => d1(p.pix) },
