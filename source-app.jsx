@@ -259,13 +259,16 @@ const bySchool = (rows, school) => rows.filter((r) => r.school === school);
 const sum = (rows, key) => rows.reduce((a, r) => a + Number(r[key] || 0), 0);
 
 // ── Componentes base ──
+let PREV_LABEL = "";
 function Delta({ value, invert = false }) {
   if (value == null) return <span style={{ fontSize: 11, color: T.muted }}>—</span>;
   const good = invert ? value < 0 : value > 0;
   const color = value === 0 ? T.muted : good ? T.green : T.red;
   const arrow = value > 0 ? "▲" : value < 0 ? "▼" : "•";
   return (
-    <span style={{ fontSize: 11.5, color, fontWeight: 500, whiteSpace: "nowrap" }}>
+    <span
+      title={`Variação em relação ao período anterior de mesma duração${PREV_LABEL ? ` (${PREV_LABEL})` : ""}. Ex.: ao filtrar "Mês atual", compara com o mês anterior; ao filtrar "7 dias", com os 7 dias imediatamente anteriores.`}
+      style={{ fontSize: 11.5, color, fontWeight: 500, whiteSpace: "nowrap", cursor: "help", borderBottom: `1px dotted ${T.border}` }}>
       {arrow} {Math.abs(value * 100).toFixed(0)}% vs anterior
     </span>
   );
@@ -391,6 +394,7 @@ const pgBtn = (off) => ({ background: T.panelSoft, color: off ? T.muted : T.text
 
 // ── Aba 1: Visão Geral Comercial ──
 function AbaVisaoGeral({ data, extra, qual, fila, schools }) {
+  const [modoFunil, setModoFunil] = useState("atual");
   const vg = data.visao_geral, fe = data.fechamentos, fea = data.fechamentos_ant, va = data.visao_ant;
   const kpiRow = (school) => {
     const v = bySchool(vg, school)[0] || {};
@@ -439,6 +443,40 @@ function AbaVisaoGeral({ data, extra, qual, fila, schools }) {
     );
   };
 
+  // carteira atual por escola (situação de agora)
+  const carteiraFor = (school) => {
+    const rows = (extra ? extra.carteira_atual.filter((c) => c.school === school) : []).sort((a, b) => a.sort - b.sort);
+    if (!rows.length) return (
+      <div key={school} style={{ flex: 1, minWidth: 260 }}>
+        <div style={{ marginBottom: 8 }}><SchoolTag school={school} /></div>
+        <Placeholder label="Sem leads em aberto" />
+      </div>
+    );
+    const max = Math.max(...rows.map((r) => r.leads), 1);
+    const total = rows.reduce((a, r) => a + Number(r.leads), 0);
+    const valorTotal = rows.reduce((a, r) => a + Number(r.valor || 0), 0);
+    const c = SCHOOLS[school].color;
+    return (
+      <div key={school} style={{ flex: 1, minWidth: 260 }}>
+        <div style={{ marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+          <SchoolTag school={school} />
+          <span style={{ fontSize: 11.5, color: T.muted }}>{num(total)} em aberto · {brl(valorTotal)}</span>
+        </div>
+        {rows.map((r) => (
+          <div key={r.etapa} style={{ marginBottom: 7 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, marginBottom: 3, gap: 8 }}>
+              <span style={{ color: T.muted }}>{r.etapa}</span>
+              <span style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{num(r.leads)} · {brl(r.valor)}</span>
+            </div>
+            <div style={{ height: 9, background: T.panelSoft, borderRadius: 5, overflow: "hidden" }}>
+              <div style={{ width: `${(r.leads / max) * 100}%`, height: "100%", background: c, borderRadius: 5 }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   // série diária multi-escola
   const days = [...new Set(data.serie_diaria.map((r) => r.dia))].sort();
   const serieData = days.map((d) => {
@@ -454,8 +492,23 @@ function AbaVisaoGeral({ data, extra, qual, fila, schools }) {
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <div>{schools.map(kpiRow)}</div>
-      <Panel title="Funil consolidado (leads do período, por etapa)">
-        <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>{schools.map(funnelFor)}</div>
+      <Panel title={modoFunil === "atual" ? "Situação atual do funil (todos os leads em aberto)" : "Funil dos leads criados no período"}
+        right={
+          <span style={{ display: "inline-flex", gap: 4 }}>
+            {[["atual", "Situação atual"], ["periodo", "Leads do período"]].map(([id, lab]) => (
+              <button key={id} onClick={() => setModoFunil(id)}
+                style={{ background: modoFunil === id ? T.ink : "transparent", color: modoFunil === id ? T.onInk : T.ink,
+                  border: `1px solid ${modoFunil === id ? T.ink : T.border}`, borderRadius: 7, padding: "5px 11px",
+                  fontSize: 11.5, cursor: "pointer", fontFamily: font, whiteSpace: "nowrap" }}>{lab}</button>
+            ))}
+          </span>
+        }>
+        <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>{schools.map(modoFunil === "atual" ? carteiraFor : funnelFor)}</div>
+        <div style={{ fontSize: 11.5, color: T.muted, marginTop: 10, lineHeight: 1.6 }}>
+          {modoFunil === "atual"
+            ? "Fotografia de agora: onde estão todos os leads em aberto neste momento, com o valor potencial de cada etapa. Independe do filtro de período — serve para o supervisor decidir a ação do dia."
+            : "Apenas os leads criados dentro do período filtrado, incluindo os já ganhos e perdidos — serve para avaliar o desempenho daquela safra de leads."}
+        </div>
       </Panel>
       <Panel title="Entrada de leads × matrículas por dia">
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 11.5, color: T.muted, marginBottom: 8 }}>
@@ -564,20 +617,6 @@ function AbaVisaoGeral({ data, extra, qual, fila, schools }) {
       })()}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 14 }}>
-        <Panel title="Carteira atual (todos os leads em aberto, por etapa)">
-          {extra ? <DataTable
-            columns={[
-              { key: "school", label: "Escola", render: (r) => <SchoolTag school={r.school} /> },
-              { key: "etapa", label: "Etapa" },
-              { key: "leads", label: "Leads", render: (r) => num(r.leads) },
-              { key: "valor", label: "Valor potencial", render: (r) => brl(r.valor) },
-            ]}
-            rows={extra.carteira_atual.filter((c) => schools.includes(c.school))}
-            initialSort={{ key: "leads", dir: "desc" }} pageSize={7}
-          /> : <Placeholder label="Carregando…" />}
-          <div style={{ fontSize: 11, color: T.muted, marginTop: 6 }}>Fotografia de agora, independente do período selecionado.</div>
-        </Panel>
-
         <Panel title="Entrada de leads por dia da semana × turno">
           {extra ? (() => {
             const dias = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
@@ -1943,6 +1982,13 @@ export default function DashboardEdilvo() {
       from = applied.from; to = applied.to;
     } else ({ from, to } = periodoRange(periodo));
     setLoading(true); setError(null); setPeriodoAtualFrom(from);
+    try {
+      const dFrom = new Date(from), dTo = new Date(to);
+      const dur = dTo - dFrom;
+      const pFrom = new Date(dFrom - dur), pTo = new Date(dFrom - 86400000);
+      const fmt = (d) => d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+      PREV_LABEL = `${fmt(pFrom)} a ${fmt(pTo)}`;
+    } catch (e) { PREV_LABEL = ""; }
     const rpc = (name, body) => fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", apikey: window.EDILVO_ANON_KEY, Authorization: `Bearer ${window.EDILVO_ANON_KEY}` },
