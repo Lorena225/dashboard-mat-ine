@@ -17,13 +17,13 @@ const THEMES = {
     bg: "#FFFFFF", panel: "#FFFFFF", panelSoft: "#F6F6F5", border: "#E4E4E2",
     text: "#111111", muted: "#6E6E6A", gold: "#B08D3E", steel: "#2E7D95",
     green: "#1F7A3F", red: "#C0392B", amber: "#A8720A", ink: "#111111", onInk: "#FFFFFF",
-    shadow: "0 1px 3px rgba(20,18,12,.06)",
+    shadow: "0 1px 3px rgba(20,18,12,.06)", tint: "12", tintForte: "22",
   },
   escuro: {
     bg: "#0E0E10", panel: "#17171A", panelSoft: "#1F1F23", border: "#2C2C33",
     text: "#ECEAE4", muted: "#9B968B", gold: "#D9B45B", steel: "#6FB5C9",
     green: "#5FBF77", red: "#E06C5F", amber: "#D9A05B", ink: "#ECEAE4", onInk: "#111111",
-    shadow: "0 1px 3px rgba(0,0,0,.5)",
+    shadow: "0 1px 3px rgba(0,0,0,.5)", tint: "1F", tintForte: "33",
   },
 };
 const T = { ...THEMES.claro };
@@ -296,7 +296,7 @@ function Delta({ value, invert = false }) {
 
 function Kpi({ label, value, delta, invert, accent, title }) {
   return (
-    <div style={{ background: T.panel, border: `1px solid ${T.border}`, borderTop: `2px solid ${accent || T.border}`, borderRadius: 10, padding: "13px 15px", minWidth: 0 }}>
+    <div style={{ background: accent && accent !== T.ink ? accent + T.tint : T.panel, border: `1px solid ${accent && accent !== T.ink ? accent + T.tintForte : T.border}`, borderTop: `3px solid ${accent || T.border}`, borderRadius: 10, padding: "13px 15px", minWidth: 0, boxShadow: T.shadow }}>
       <div title={title} style={{ fontSize: 10.5, letterSpacing: ".07em", textTransform: "uppercase", color: T.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", cursor: title ? "help" : "default" }}>{label}</div>
       <div style={{ fontSize: 25, fontWeight: 600, margin: "3px 0 2px", fontVariantNumeric: "tabular-nums", color: T.text }}>{value}</div>
       <Delta value={delta} invert={invert} />
@@ -308,7 +308,8 @@ function SchoolTag({ school }) {
   const s = SCHOOLS[school];
   if (!s) return null;
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: s.color, fontWeight: 500 }}>
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: s.color, fontWeight: 600,
+      background: s.color + T.tint, border: `1px solid ${s.color}${T.tintForte}`, borderRadius: 20, padding: "3px 10px 3px 8px" }}>
       <span style={{ width: 8, height: 8, borderRadius: 4, background: s.color }} />
       {s.label}
     </span>
@@ -2310,6 +2311,18 @@ function MenuHome({ data, mkt, extra, qual, schools, goTo }) {
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
+      <Panel>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 18, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 22, flexWrap: "wrap" }}>
+            <img src="https://ineprotec.com.br/img/logo-ineprotec.webp" alt="Ineprotec" style={{ height: 42 }} onError={(e) => { e.target.style.display = "none"; }} />
+            <span style={{ width: 1, height: 32, background: T.border }} />
+            <img src="https://matriculaead-landing.vercel.app/images/logo.png" alt="Matrícula EAD" style={{ height: 42 }} onError={(e) => { e.target.style.display = "none"; }} />
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {schools.map((s) => <SchoolTag key={s} school={s} />)}
+          </div>
+        </div>
+      </Panel>
       <Panel title="Painel de metas do mês">
         {budgets.length ? (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
@@ -2569,7 +2582,7 @@ export default function DashboardEdilvo() {
         {/* ───── MENU LATERAL ───── */}
         <aside className="sidebar">
           <div style={{ display: "flex", flexDirection: "column", gap: 8, margin: "12px 0 18px" }}>
-            <img src="https://ineprotec-landing.vercel.app/images/logo.png" alt="Ineprotec" style={{ height: 34, alignSelf: "flex-start" }} onError={(e) => { e.target.style.display = "none"; }} />
+            <img src="https://ineprotec.com.br/img/logo-ineprotec.webp" alt="Ineprotec" style={{ height: 34, alignSelf: "flex-start" }} onError={(e) => { e.target.style.display = "none"; }} />
             <img src="https://matriculaead-landing.vercel.app/images/logo.png" alt="Matrícula EAD" style={{ height: 34, alignSelf: "flex-start" }} onError={(e) => { e.target.style.display = "none"; }} />
           </div>
           <nav>
