@@ -2278,13 +2278,13 @@ function periodoRange(id) {
 
 const ABAS = [
   { id: "visao", label: "Visão Geral" },
-  { id: "funil", label: "Funil & Perdas" },
-  { id: "vendedores", label: "Vendedores" },
   { id: "origem", label: "Origem, Canal & Região" },
-  { id: "financeiro", label: "Financeiro & Produto" },
-  { id: "metas", label: "Metas & Comissões" },
-  { id: "sdr", label: "Agente SDR" },
   { id: "jornada", label: "Jornada & Origem" },
+  { id: "metas", label: "Metas & Comissões" },
+  { id: "vendedores", label: "Vendedores" },
+  { id: "funil", label: "Funil & Perdas" },
+  { id: "sdr", label: "Agente SDR" },
+  { id: "financeiro", label: "Financeiro & Produto" },
 ];
 
 export default function DashboardEdilvo() {
