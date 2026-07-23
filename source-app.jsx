@@ -260,6 +260,26 @@ const sum = (rows, key) => rows.reduce((a, r) => a + Number(r[key] || 0), 0);
 
 // ── Componentes base ──
 let PREV_LABEL = "";
+
+// ícone de ajuda com explicação em popup
+function Info({ texto }) {
+  const [aberto, setAberto] = useState(false);
+  return (
+    <span style={{ position: "relative", display: "inline-flex", marginLeft: 5, verticalAlign: "middle" }}>
+      <button onClick={() => setAberto(!aberto)} onBlur={() => setTimeout(() => setAberto(false), 150)}
+        title="O que significa?" aria-label="O que significa?"
+        style={{ width: 15, height: 15, borderRadius: 8, border: `1px solid ${T.border}`, background: T.panelSoft,
+          color: T.muted, fontSize: 10, lineHeight: "13px", cursor: "pointer", fontFamily: font, padding: 0 }}>?</button>
+      {aberto && (
+        <span style={{ position: "absolute", top: 20, left: -8, zIndex: 60, width: 290, background: T.panel,
+          border: `1px solid ${T.border}`, borderRadius: 8, boxShadow: "0 6px 20px rgba(0,0,0,.18)", padding: "10px 12px",
+          fontSize: 11.5, lineHeight: 1.6, color: T.text, fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>
+          {texto}
+        </span>
+      )}
+    </span>
+  );
+}
 function Delta({ value, invert = false }) {
   if (value == null) return <span style={{ fontSize: 11, color: T.muted }}>—</span>;
   const good = invert ? value < 0 : value > 0;
@@ -274,10 +294,10 @@ function Delta({ value, invert = false }) {
   );
 }
 
-function Kpi({ label, value, delta, invert, accent }) {
+function Kpi({ label, value, delta, invert, accent, title }) {
   return (
     <div style={{ background: T.panel, border: `1px solid ${T.border}`, borderTop: `2px solid ${accent || T.border}`, borderRadius: 10, padding: "13px 15px", minWidth: 0 }}>
-      <div style={{ fontSize: 10.5, letterSpacing: ".07em", textTransform: "uppercase", color: T.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</div>
+      <div title={title} style={{ fontSize: 10.5, letterSpacing: ".07em", textTransform: "uppercase", color: T.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", cursor: title ? "help" : "default" }}>{label}</div>
       <div style={{ fontSize: 25, fontWeight: 600, margin: "3px 0 2px", fontVariantNumeric: "tabular-nums", color: T.text }}>{value}</div>
       <Delta value={delta} invert={invert} />
     </div>
@@ -1824,7 +1844,8 @@ function AbaJornada({ jor, schools }) {
 }
 
 // ═══════════════ MENU 2: MARKETING ═══════════════
-function MenuMarketing({ mkt, qual, schools }) {
+function MenuMarketing({ mkt, qual, orig, schools }) {
+  const [canalSel, setCanalSel] = useState(null);
   if (!mkt) return <div style={{ color: T.muted, fontSize: 13, padding: 30, textAlign: "center" }}>Carregando dados de mídia…</div>;
   const kpis = mkt.kpis.filter((k) => schools.includes(k.school));
   const kpisAnt = mkt.kpis_ant || [];
@@ -1843,11 +1864,11 @@ function MenuMarketing({ mkt, qual, schools }) {
       <div key={school} style={{ marginBottom: 14 }}>
         <div style={{ marginBottom: 8 }}><SchoolTag school={school} /></div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(148px, 1fr))", gap: 10 }}>
-          <Kpi accent={c} label="Investimento" value={brl(spend)} delta={deltaPct(spend, spendAnt)} invert />
-          <Kpi accent={c} label="Leads (mídia)" value={num(leads)} delta={deltaPct(leads, leadsAnt)} />
-          <Kpi accent={c} label="CPL" value={cpl != null ? brl(cpl) : "—"} delta={cpl != null && cplAnt != null ? (cpl - cplAnt) / cplAnt : null} invert />
-          <Kpi accent={c} label="Cliques" value={num(clicks)} />
-          <Kpi accent={c} label="CPQL / ROAS" value="—" />
+          <Kpi accent={c} label="Investimento" title="Soma do gasto em Meta Ads e Google Ads no período, pelas APIs das plataformas." value={brl(spend)} delta={deltaPct(spend, spendAnt)} invert />
+          <Kpi accent={c} label="Leads (mídia)" title="Leads que as próprias plataformas reportam como conversão. O Meta costuma reportar zero em campanhas de mensagem: nesses casos, use a contagem pela Origem do Kommo." value={num(leads)} delta={deltaPct(leads, leadsAnt)} />
+          <Kpi accent={c} label="CPL" title="Custo por lead: investimento do período dividido pelos leads reportados pelas plataformas de anúncio." value={cpl != null ? brl(cpl) : "—"} delta={cpl != null && cplAnt != null ? (cpl - cplAnt) / cplAnt : null} invert />
+          <Kpi accent={c} label="Cliques" title="Cliques nos anúncios no período, somando Meta e Google." value={num(clicks)} />
+          <Kpi accent={c} label="CPQL / ROAS" title="Custo por lead qualificado e retorno sobre investimento. Dependem de amarrar cada matrícula à campanha exata; com o rastreio por Origem já em uso, ligam assim que os nomes das campanhas do anúncio forem padronizados iguais aos valores gravados na Origem." value="—" />
         </div>
       </div>
     );
@@ -2023,7 +2044,111 @@ function MenuMarketing({ mkt, qual, schools }) {
         </div>
       </Panel>
 
-      <Panel title="Atribuição de mídia — leads reportados × leads rastreados pela Origem">
+      <Panel title={<span>Origem dos leads — visão macro<Info texto="Agrupa toda a entrada de leads por natureza da origem: Mídia paga (Meta e Google Ads), Digital próprio (site e formulários), Orgânico (indicação), Contato direto (WhatsApp) e Não rastreado (sem o campo Origem preenchido no Kommo). Responde: de onde vem o volume e de onde vem a matrícula." /></span>}>
+        {orig && orig.por_macro.filter((m) => schools.includes(m.school)).length ? (() => {
+          const base = orig.por_macro.filter((m) => schools.includes(m.school));
+          const macros = [...new Set(base.map((m) => m.macro))].map((nome) => {
+            const rs = base.filter((m) => m.macro === nome);
+            const leads = sum(rs, "leads"), matr = sum(rs, "matriculas"), rec = sum(rs, "receita");
+            const row = { macro: nome, leads, matriculas: matr, receita: rec, conversao: leads > 0 ? matr / leads : 0 };
+            schools.forEach((s) => { row[s] = sum(rs.filter((m) => m.school === s), "leads"); });
+            return row;
+          }).sort((a, b) => b.leads - a.leads);
+          const totalLeads = sum(macros, "leads");
+          return (
+            <>
+              <div style={{ width: "100%", height: Math.max(160, macros.length * 40 + 30) }}>
+                <ResponsiveContainer>
+                  <BarChart data={macros} layout="vertical" margin={{ top: 0, right: 40, left: 10, bottom: 0 }} barGap={2}>
+                    <XAxis type="number" stroke={T.muted} fontSize={10} tickLine={false} axisLine={false} allowDecimals={false} />
+                    <YAxis type="category" dataKey="macro" stroke={T.muted} fontSize={11} width={155} tickLine={false} axisLine={false} />
+                    <Tooltip content={<ChartTip />} cursor={{ fill: "#00000006" }} />
+                    {schools.map((s) => (
+                      <Bar key={s} dataKey={s} name={SCHOOLS[s].label} fill={SCHOOLS[s].color} radius={[0, 4, 4, 0]} maxBarSize={16}>
+                        <LabelList dataKey={s} position="right" fill={T.muted} fontSize={10} formatter={(v) => (v > 0 ? v : "")} />
+                      </Bar>
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <DataTable
+                columns={[
+                  { key: "macro", label: "Natureza da origem", style: { fontWeight: 500 } },
+                  { key: "leads", label: "Leads", render: (r) => `${num(r.leads)} · ${pct(totalLeads > 0 ? r.leads / totalLeads : null)}` },
+                  { key: "matriculas", label: "Matrículas", render: (r) => num(r.matriculas) },
+                  { key: "conversao", label: "Conversão", render: (r) => pct(r.conversao) },
+                  { key: "receita", label: "Receita", render: (r) => brl(r.receita) },
+                ]}
+                rows={macros}
+                initialSort={{ key: "leads", dir: "desc" }}
+              />
+            </>
+          );
+        })() : <Placeholder label="Sem leads no período" />}
+      </Panel>
+
+      <Panel title={<span>Detalhamento por canal e criativo<Info texto="Abre cada canal no nível registrado no campo Origem do Kommo (padrão ESCOLA-CANAL-DETALHE). No Meta, o detalhe é o criativo ou a campanha (Instagram, Facebook, Técnico em Segurança do Trabalho...); no Google, o tipo de campanha (Pesquisa); no Site, a página ou formulário. Clique num canal para ver o detalhamento." /></span>}>
+        {orig && orig.por_canal.filter((c) => schools.includes(c.school)).length ? (() => {
+          const canais = orig.por_canal.filter((c) => schools.includes(c.school));
+          const nomesCanal = [...new Set(canais.map((c) => c.canal))].map((nome) => {
+            const rs = canais.filter((c) => c.canal === nome);
+            const leads = sum(rs, "leads"), matr = sum(rs, "matriculas");
+            return { canal: nome, leads, matriculas: matr };
+          }).sort((a, b) => b.leads - a.leads);
+          const canal = canalSel && nomesCanal.some((c) => c.canal === canalSel) ? canalSel : nomesCanal[0].canal;
+          const det = orig.por_detalhe.filter((d) => schools.includes(d.school) && d.canal === canal)
+            .map((d) => ({ ...d, conversao: d.leads > 0 ? d.matriculas / d.leads : 0 }));
+          const gastoCanal = (orig.gasto_canal || []).filter((g) => schools.includes(g.school) && g.canal === canal);
+          const spend = sum(gastoCanal, "spend");
+          const leadsCanal = sum(det, "leads"), matrCanal = sum(det, "matriculas");
+          return (
+            <>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+                {nomesCanal.map((c) => {
+                  const ativo = c.canal === canal;
+                  return (
+                    <button key={c.canal} onClick={() => setCanalSel(c.canal)}
+                      style={{ background: ativo ? T.ink : "transparent", color: ativo ? T.onInk : T.ink,
+                        border: `1px solid ${ativo ? T.ink : T.border}`, borderRadius: 8, padding: "6px 12px",
+                        fontSize: 12, fontWeight: ativo ? 600 : 400, cursor: "pointer", fontFamily: font }}>
+                      {c.canal} · {num(c.leads)}
+                    </button>
+                  );
+                })}
+              </div>
+              {spend > 0 && (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 12 }}>
+                  <Kpi accent={T.ink} label="Investimento no canal" value={brl(spend)} />
+                  <Kpi accent={T.ink} label="CPL real" value={leadsCanal > 0 ? brl(spend / leadsCanal) : "—"} />
+                  <Kpi accent={T.ink} label="CAC real" value={matrCanal > 0 ? brl(spend / matrCanal) : "—"} />
+                  <Kpi accent={T.ink} label="Conversão do canal" value={pct(leadsCanal > 0 ? matrCanal / leadsCanal : null)} />
+                </div>
+              )}
+              <DataTable
+                columns={[
+                  { key: "school", label: "Escola", render: (r) => <SchoolTag school={r.school} /> },
+                  { key: "detalhe", label: "Detalhe (criativo / campanha)", style: { whiteSpace: "normal", minWidth: 190 } },
+                  { key: "leads", label: "Leads", render: (r) => num(r.leads) },
+                  { key: "matriculas", label: "Matrículas", render: (r) => num(r.matriculas) },
+                  { key: "conversao", label: "Conversão", render: (r) => pct(r.conversao) },
+                  { key: "receita", label: "Receita", render: (r) => brl(r.receita) },
+                  { key: "origem", label: "Valor no Kommo", style: { color: T.muted, fontSize: 11 } },
+                ]}
+                rows={det}
+                initialSort={{ key: "leads", dir: "desc" }}
+                pageSize={10}
+              />
+              <div style={{ fontSize: 11.5, color: T.muted, marginTop: 8, lineHeight: 1.6 }}>
+                {spend > 0
+                  ? "CPL e CAC reais usam o investimento do canal dividido pelos leads e matrículas efetivamente rastreados pela Origem — mais confiável que a conversão reportada pela plataforma."
+                  : "Canal sem investimento de mídia no período: os números aqui são de entrada orgânica ou direta."}
+              </div>
+            </>
+          );
+        })() : <Placeholder label="Sem leads com origem no período" />}
+      </Panel>
+
+      <Panel title={<span>Atribuição de mídia — plataforma × Origem<Info texto="Compara duas contagens do mesmo investimento: o que a plataforma de anúncio reporta como conversão e o que o Kommo registrou no campo Origem. Divergência grande significa rastreio incompleto de um dos lados — veja a explicação em destaque abaixo da tabela." /></span>}>
         {qual && qual.atribuicao_midia && qual.atribuicao_midia.filter((a) => schools.includes(a.school)).length ? (
           <>
             <DataTable
@@ -2312,6 +2437,7 @@ export default function DashboardEdilvo() {
   const [qual, setQual] = useState(null);
   const [fila, setFila] = useState(null);
   const [reg, setReg] = useState(null);
+  const [orig, setOrig] = useState(null);
   const [data, setData] = useState(LIVE ? null : SNAPSHOT);
   const [mkt, setMkt] = useState(null);
   const [extra, setExtra] = useState(null);
@@ -2348,9 +2474,10 @@ export default function DashboardEdilvo() {
       rpc("dashboard_qualidade", { p_token: RPC_TOKEN, p_from: from, p_to: to }),
       rpc("dashboard_fila", { p_token: RPC_TOKEN, p_from: from, p_to: to }),
       rpc("dashboard_regiao_curso", { p_token: RPC_TOKEN, p_from: from, p_to: to }),
+      rpc("dashboard_origem_detalhe", { p_token: RPC_TOKEN, p_from: from, p_to: to }),
     ])
-      .then(([j, m, x, w, s, jo, q, fl, rg]) => {
-        setQual(q); setFila(fl); setReg(rg);
+      .then(([j, m, x, w, s, jo, q, fl, rg, od]) => {
+        setQual(q); setFila(fl); setReg(rg); setOrig(od);
         if (w) { j = { ...j, vendedores: w.vendedores, cursos: w.cursos, faixas: w.faixas }; }
         setData(j); setMkt(m); setExtra(x); setSdr(s); setJor(jo); setLoading(false);
       })
@@ -2479,7 +2606,7 @@ export default function DashboardEdilvo() {
                     {aba === "jornada" && <AbaJornada jor={jor} schools={schools} />}
                   </>
                 )}
-                {menu === "marketing" && <MenuMarketing mkt={mkt} qual={qual} schools={schools} />}
+                {menu === "marketing" && <MenuMarketing mkt={mkt} qual={qual} orig={orig} schools={schools} />}
                 {menu === "home" && <MenuHome data={data} mkt={mkt} extra={extra} qual={qual} schools={schools} goTo={setMenu} />}
               </>
             )}
