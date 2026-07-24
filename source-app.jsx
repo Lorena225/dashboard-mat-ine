@@ -2816,12 +2816,14 @@ export default function DashboardEdilvo() {
                     style={{ ...btn(true), opacity: customFrom && customTo ? 1 : 0.4 }}>Aplicar</button>
                 </span>
               )}
+              <span style={{ width: 1, height: 22, background: T.border, margin: "0 4px" }} />
+              <span style={{ fontSize: 11, color: T.muted, marginRight: 2 }}>Escola</span>
+              <button onClick={() => setEscola("todas")} style={btn(escola === "todas")}>Todas</button>
+              <button onClick={() => setEscola("matricula_ead")} style={{ ...btn(escola === "matricula_ead"), ...(escola === "matricula_ead" ? { background: T.gold, borderColor: T.gold, color: "#FFFFFF" } : {}) }}>Matrícula EAD</button>
+              <button onClick={() => setEscola("ineprotec")} style={{ ...btn(escola === "ineprotec"), ...(escola === "ineprotec" ? { background: T.steel, borderColor: T.steel, color: "#FFFFFF" } : {}) }}>Ineprotec</button>
             </div>
             <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
               {fresh && <FreshChip fresh={fresh} />}
-              <button onClick={() => setEscola("todas")} style={btn(escola === "todas")}>Todas</button>
-              <button onClick={() => setEscola("matricula_ead")} style={{ ...btn(escola === "matricula_ead"), ...(escola === "matricula_ead" ? { background: T.gold, borderColor: T.gold } : {}) }}>Matrícula EAD</button>
-              <button onClick={() => setEscola("ineprotec")} style={{ ...btn(escola === "ineprotec"), ...(escola === "ineprotec" ? { background: T.steel, borderColor: T.steel } : {}) }}>Ineprotec</button>
             </div>
           </div>
 
