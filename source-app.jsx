@@ -320,8 +320,8 @@ function Panel({ title, right, children, style }) {
   return (
     <div style={{ background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, padding: 16, boxShadow: T.shadow, ...style }}>
       {(title || right) && (
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 8 }}>
-          <div style={{ fontSize: 13, fontWeight: 600 }}>{title}</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 8, flexWrap: "wrap" }}>
+          <h2 style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>{title}</h2>
           {right}
         </div>
       )}
@@ -1457,7 +1457,7 @@ function AbaFinanceiro({ data, schools }) {
           <div style={{ width: "100%", height: Math.max(180, topCursos.length * 40 + 40) }}>
             <ResponsiveContainer>
               <BarChart data={topCursos} layout="vertical" margin={{ top: 0, right: 70, left: 10, bottom: 0 }}>
-                <XAxis type="number" stroke={T.muted} fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => "R$" + (v / 1000).toFixed(0) + "k"} />
+                <XAxis type="number" stroke={T.muted} fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => v >= 1000 ? "R$ " + (v / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " mil" : "R$ " + v} />
                 <YAxis type="category" dataKey="nome" stroke={T.muted} fontSize={10.5} width={215} tickLine={false} axisLine={false} />
                 <Tooltip content={({ active, payload, label }) => active && payload?.length ? (
                   <div style={{ background: T.panelSoft, border: `1px solid ${T.border}`, borderRadius: 8, padding: "8px 12px", fontSize: 12, fontFamily: font }}>
@@ -1496,7 +1496,7 @@ function AbaFinanceiro({ data, schools }) {
                 <BarChart data={pagChart} margin={{ top: 4, right: 8, left: -8, bottom: 0 }} barGap={3}>
                   <CartesianGrid stroke={T.border} vertical={false} />
                   <XAxis dataKey="forma" stroke={T.muted} fontSize={10} tickLine={false} axisLine={false} interval={0} />
-                  <YAxis stroke={T.muted} fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => "R$" + (v / 1000).toFixed(0) + "k"} />
+                  <YAxis stroke={T.muted} fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => v >= 1000 ? "R$ " + (v / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " mil" : "R$ " + v} />
                   <Tooltip content={({ active, payload, label }) => active && payload?.length ? (
                     <div style={{ background: T.panelSoft, border: `1px solid ${T.border}`, borderRadius: 8, padding: "8px 12px", fontSize: 12, fontFamily: font }}>
                       <div style={{ color: T.muted, marginBottom: 4 }}>{label}</div>
@@ -1535,16 +1535,27 @@ function AbaMetas({ data, periodoFrom, onSaved }) {
   const addFaixa = () => setFaixas((fs) => [...fs, { nome: "Nova faixa", min: 0, boleto: 0, cartao: 0, pix: 0 }]);
   const delFaixa = (i) => setFaixas((fs) => fs.filter((_, j) => j !== i));
 
+  const [confirmar, setConfirmar] = useState(false);
+  const [autor, setAutor] = useState("");
+  const original = (data.faixas || []);
+  const mudancas = faixas.map((f, i) => {
+    const o = original[i] || {};
+    const difs = ["nome", "min", "boleto", "cartao", "pix"].filter((k) => String(o[k] ?? "") !== String(f[k] ?? ""));
+    return difs.length ? { i, nome: f.nome, difs, antes: o, depois: f } : null;
+  }).filter(Boolean);
+  const removidas = original.length > faixas.length ? original.slice(faixas.length) : [];
+
   const salvar = () => {
     setSalvando(true); setMsg(null);
     const payload = faixas.map((f) => ({ nome: f.nome, min: Number(f.min) || 0, boleto: Number(f.boleto) || 0, cartao: Number(f.cartao) || 0, pix: Number(f.pix) || 0 }));
     fetch(`${SUPABASE_URL}/rest/v1/rpc/metas_set`, {
       method: "POST",
       headers: { "Content-Type": "application/json", apikey: window.EDILVO_ANON_KEY, Authorization: `Bearer ${window.EDILVO_ANON_KEY}` },
-      body: JSON.stringify({ p_token: RPC_TOKEN, p_month: String(periodoFrom || "").slice(0, 8) + "01", p_faixas: payload }),
+      body: JSON.stringify({ p_token: RPC_TOKEN, p_month: String(periodoFrom || "").slice(0, 8) + "01",
+        p_faixas: payload.map((f) => ({ ...f, _autor: autor || "não identificado", _em: new Date().toISOString() })) }),
     })
       .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
-      .then(() => { setSalvando(false); setMsg("Metas salvas — relatórios recalculados."); if (onSaved) onSaved(); })
+      .then(() => { setSalvando(false); setConfirmar(false); setMsg("Metas salvas — relatórios recalculados."); if (onSaved) onSaved(); })
       .catch((e) => { setSalvando(false); setMsg("Não foi possível salvar (" + e.message + ")."); });
   };
 
@@ -1571,7 +1582,7 @@ function AbaMetas({ data, periodoFrom, onSaved }) {
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <Panel title={`Tabela de metas e premiação — ${mesRef ? mesRef.split("-").reverse().join("/") : "mês do período"}`}
-        right={<button onClick={salvar} disabled={salvando} style={{ background: T.ink, color: T.onInk, border: "none", borderRadius: 8, padding: "7px 16px", fontSize: 12.5, fontWeight: 500, cursor: "pointer", fontFamily: font, opacity: salvando ? 0.5 : 1 }}>{salvando ? "Salvando…" : "Salvar metas"}</button>}>
+        right={<button onClick={() => setConfirmar(true)} disabled={salvando || mudancas.length + removidas.length === 0} style={{ background: T.ink, color: T.onInk, border: "none", borderRadius: 8, padding: "7px 16px", fontSize: 12.5, fontWeight: 500, cursor: "pointer", fontFamily: font, opacity: salvando ? 0.5 : 1 }}>{salvando ? "Salvando…" : mudancas.length + removidas.length === 0 ? "Sem alterações" : `Revisar e salvar (${mudancas.length + removidas.length})`}</button>}>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead><tr>
@@ -1592,6 +1603,31 @@ function AbaMetas({ data, periodoFrom, onSaved }) {
             </tbody>
           </table>
         </div>
+        {confirmar && (
+          <div style={{ border: `1px solid ${T.amber}`, background: T.amber + "0d", borderRadius: 8, padding: "14px 16px", marginTop: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Confirmar alteração das metas de {mesRef ? mesRef.split("-").reverse().join("/") : "—"}</div>
+            <div style={{ fontSize: 12, lineHeight: 1.7, marginBottom: 10 }}>
+              {mudancas.map((m) => (
+                <div key={m.i}>
+                  <b>{m.nome}</b>: {m.difs.map((k) => `${k} ${m.antes[k] ?? "—"} → ${m.depois[k]}`).join(" · ")}
+                </div>
+              ))}
+              {removidas.map((r, i) => <div key={"r" + i} style={{ color: T.red }}><b>{r.nome}</b>: faixa removida</div>)}
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <input value={autor} onChange={(e) => setAutor(e.target.value)} placeholder="Seu nome (fica registrado)"
+                style={{ ...inp, width: 220 }} />
+              <button onClick={salvar} disabled={salvando || !autor.trim()}
+                style={{ background: T.ink, color: T.onInk, border: "none", borderRadius: 8, padding: "7px 16px", fontSize: 12.5, fontWeight: 500, cursor: "pointer", fontFamily: font, opacity: autor.trim() ? 1 : 0.4 }}>
+                {salvando ? "Salvando…" : "Confirmar"}
+              </button>
+              <button onClick={() => setConfirmar(false)}
+                style={{ background: "transparent", color: T.ink, border: `1px solid ${T.border}`, borderRadius: 8, padding: "7px 14px", fontSize: 12.5, cursor: "pointer", fontFamily: font }}>Cancelar</button>
+            </div>
+            <div style={{ fontSize: 11, color: T.muted, marginTop: 8 }}>A alteração vale para o mês do período selecionado e recalcula as comissões. Meses anteriores mantêm a tabela vigente na época.</div>
+          </div>
+        )}
+
         <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 10, flexWrap: "wrap" }}>
           <button onClick={addFaixa} style={{ background: T.panelSoft, color: T.ink, border: `1px solid ${T.border}`, borderRadius: 8, padding: "6px 14px", fontSize: 12, cursor: "pointer", fontFamily: font }}>+ Adicionar faixa</button>
           {msg && <span style={{ fontSize: 12, color: msg.indexOf("salvas") > 0 ? T.green : T.red }}>{msg}</span>}
@@ -2049,7 +2085,7 @@ function MenuMarketing({ mkt, qual, orig, schools }) {
             <BarChart data={distData} margin={{ top: 4, right: 8, left: -8, bottom: 0 }} barGap={3}>
               <CartesianGrid stroke={T.border} vertical={false} />
               <XAxis dataKey="escola" stroke={T.muted} fontSize={11} tickLine={false} axisLine={false} />
-              <YAxis stroke={T.muted} fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => "R$" + (v / 1000).toFixed(1) + "k"} />
+              <YAxis stroke={T.muted} fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => v >= 1000 ? "R$ " + (v / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " mil" : "R$ " + v} />
               <Tooltip content={({ active, payload, label }) => active && payload?.length ? (
                 <div style={{ background: T.panelSoft, border: `1px solid ${T.border}`, borderRadius: 8, padding: "8px 12px", fontSize: 12, fontFamily: font }}>
                   <div style={{ color: T.muted, marginBottom: 4 }}>{label}</div>
@@ -2081,7 +2117,7 @@ function MenuMarketing({ mkt, qual, orig, schools }) {
               <LineChart data={dd} margin={{ top: 4, right: 8, left: -8, bottom: 0 }}>
                 <CartesianGrid stroke={T.border} vertical={false} />
                 <XAxis dataKey="dia" stroke={T.muted} fontSize={10} tickLine={false} axisLine={false} />
-                <YAxis stroke={T.muted} fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => "R$" + v.toFixed(0)} />
+                <YAxis stroke={T.muted} fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => "R$ " + Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} />
                 <Tooltip content={({ active, payload, label }) => active && payload?.length ? (
                   <div style={{ background: T.panelSoft, border: `1px solid ${T.border}`, borderRadius: 8, padding: "8px 12px", fontSize: 12, fontFamily: font }}>
                     <div style={{ color: T.muted, marginBottom: 4 }}>{label}</div>
@@ -2727,8 +2763,10 @@ export default function DashboardEdilvo() {
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap'); *{box-sizing:border-box} body{margin:0} img{max-width:100%}
         .layout{display:flex;min-height:100vh}
         .sidebar{width:225px;flex-shrink:0;border-right:1px solid ${T.border};padding:18px 14px;position:sticky;top:0;height:100vh;overflow-y:auto;background:${T.panel};display:flex;flex-direction:column}
-        .content{flex:1;min-width:0}
+        .content{flex:1;min-width:0;overflow-x:hidden}
         @media(max-width:760px){
+          .layout{overflow-x:hidden}
+          h2{font-size:12.5px}
           .layout{display:block}
           .sidebar{width:100%;height:auto;position:static;border-right:none;border-bottom:1px solid ${T.border};padding:12px 10px}
           .sidebar .subnav{display:flex;gap:4px;overflow-x:auto}
@@ -2747,13 +2785,13 @@ export default function DashboardEdilvo() {
           </div>
           <nav>
             {MENUS.map((m) => (
-              <button key={m.id} onClick={() => setMenu(m.id)} style={navItem(menu === m.id)}>{m.label}</button>
+              <button key={m.id} onClick={() => setMenu(m.id)} aria-current={menu === m.id ? "page" : undefined} style={navItem(menu === m.id)}>{m.label}</button>
             ))}
           </nav>
           {menu === "comercial" && (
             <div className="subnav" style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.border}` }}>
               {ABAS.map((a) => (
-                <button key={a.id} onClick={() => setAba(a.id)}
+                <button key={a.id} onClick={() => setAba(a.id)} aria-current={aba === a.id ? "page" : undefined}
                   style={{ ...navItem(aba === a.id), fontSize: 12, padding: "8px 12px", background: aba === a.id ? T.panelSoft : "transparent", color: T.ink, borderLeft: aba === a.id ? `3px solid ${T.ink}` : "3px solid transparent", borderRadius: 6 }}>
                   {a.label}
                 </button>
@@ -2799,7 +2837,8 @@ export default function DashboardEdilvo() {
             </div>
           </div>
 
-          <div className="pad" style={{ padding: "16px 18px 40px", maxWidth: 1240 }}>
+          <main className="pad" style={{ padding: "16px 18px 40px", maxWidth: 1240 }}>
+            <h1 style={{ position: "absolute", left: -9999, fontSize: 1 }}>Painel Edilvo — Matrícula EAD e Ineprotec</h1>
             <div style={{ fontSize: 11.5, color: T.muted, marginBottom: 10 }}>
               {MENUS.find((m) => m.id === menu)?.label}{menu === "comercial" ? ` · ${ABAS.find((a) => a.id === aba)?.label}` : ""} · período: {rotulo || "—"} · escolas sempre lado a lado, nunca somadas
             </div>
@@ -2825,7 +2864,7 @@ export default function DashboardEdilvo() {
                 {menu === "home" && <MenuHome data={data} mkt={mkt} extra={extra} qual={qual} schools={schools} goTo={setMenu} />}
               </>
             )}
-          </div>
+          </main>
         </div>
       </div>
     </div>
