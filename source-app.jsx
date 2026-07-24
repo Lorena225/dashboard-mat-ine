@@ -1890,6 +1890,108 @@ function AbaJornada({ jor, schools }) {
   );
 }
 
+
+// ── Aba: Pipeline & Contato ──
+function AbaPipeline({ pipe, schools }) {
+  if (!pipe) return <div style={{ color: T.muted, fontSize: 13, padding: 30, textAlign: "center" }}>Carregando pipeline…</div>;
+  const resumo = (pipe.resumo || []).filter((r) => schools.includes(r.school));
+  const grupos = (pipe.grupos || []).filter((g) => schools.includes(g.school));
+  const aging = (pipe.aging || []).filter((a) => schools.includes(a.school));
+  const contato = (pipe.contactabilidade || []).filter((c) => schools.includes(c.school));
+  if (!resumo.length) return <Placeholder label="Sem leads em aberto" />;
+
+  const gruposNomes = [...new Set(grupos.map((g) => g.grupo))].sort();
+  const chart = gruposNomes.filter((n) => !n.startsWith("1.")).map((nome) => {
+    const row = { grupo: nome.replace(/^\d+\.\s*/, "") };
+    schools.forEach((s) => { row[s] = sum(grupos.filter((g) => g.grupo === nome && g.school === s), "leads"); });
+    return row;
+  });
+
+  return (
+    <div style={{ display: "grid", gap: 14 }}>
+      <Panel title={<span>Pipeline qualificado<Info texto="Pipeline qualificado exclui os leads em LEAD SEM RESPOSTA — contato nunca estabelecido não é oportunidade. O forecast ponderado multiplica o valor de cada lead pela probabilidade histórica da etapa: pré-matriculado 70%, negociação 40%, aguardando decisão 30%, follow-up 15%, triagem e potenciais 5%. É estimativa de fechamento, não promessa." /></span>}>
+        {resumo.map((r) => {
+          const c = SCHOOLS[r.school].color;
+          const pctQual = r.total_aberto > 0 ? r.qualificado / r.total_aberto : 0;
+          return (
+            <div key={r.school} style={{ marginBottom: 14 }}>
+              <div style={{ marginBottom: 8 }}><SchoolTag school={r.school} /></div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
+                <Kpi accent={c} label="Pipeline qualificado" value={num(r.qualificado)} title="Leads em aberto com contato já estabelecido: do follow-up ao pré-matriculado." />
+                <Kpi accent={c} label="Valor em jogo" value={brl(r.valor_qualificado)} title="Soma do valor dos leads qualificados, sem ponderação." />
+                <Kpi accent={c} label="Forecast ponderado" value={brl(r.forecast_ponderado)} title="Valor esperado considerando a probabilidade de cada etapa." />
+                <Kpi label="Sem contato (fila)" value={num(r.sem_contato)} title="Leads em LEAD SEM RESPOSTA. Não entram no pipeline nem no forecast." />
+                <Kpi label="% qualificado do aberto" value={pct(pctQual)} title="Fatia do estoque aberto que é oportunidade real. Valores muito baixos indicam que o volume de leads não está sendo trabalhado." />
+              </div>
+            </div>
+          );
+        })}
+      </Panel>
+
+      <Panel title={<span>Contactabilidade da coorte<Info texto="Dos leads criados no período, quantos saíram da etapa LEAD SEM RESPOSTA — ou seja, com quantos a operação conseguiu estabelecer contato. É o primeiro gargalo do funil: sem contato, nenhuma técnica de venda opera." /></span>}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 10 }}>
+          {contato.map((c) => (
+            <Kpi key={c.school} accent={SCHOOLS[c.school].color} label={`Contactabilidade · ${SCHOOLS[c.school].label}`}
+              value={pct(c.total > 0 ? c.contatados / c.total : null)}
+              title={`${num(c.contatados)} de ${num(c.total)} leads criados no período tiveram contato estabelecido.`} />
+          ))}
+        </div>
+        <div style={{ fontSize: 11.5, color: T.muted, marginTop: 8, lineHeight: 1.6 }}>
+          Tempo até a primeira resposta e percentual dentro do SLA dependem do histórico de mensagens do Kommo (Chats API), que ainda não está acessível ao painel — quando estiver, entram aqui sem mudança de estrutura.
+        </div>
+      </Panel>
+
+      <Panel title="Onde está o pipeline qualificado (por etapa)">
+        {chart.length ? (
+          <div style={{ width: "100%", height: Math.max(170, chart.length * 40 + 30) }}>
+            <ResponsiveContainer>
+              <BarChart data={chart} layout="vertical" margin={{ top: 0, right: 40, left: 10, bottom: 0 }} barGap={2}>
+                <XAxis type="number" stroke={T.muted} fontSize={10} tickLine={false} axisLine={false} allowDecimals={false} />
+                <YAxis type="category" dataKey="grupo" stroke={T.muted} fontSize={11} width={175} tickLine={false} axisLine={false} />
+                <Tooltip content={<ChartTip />} cursor={{ fill: "#00000006" }} />
+                {schools.map((s) => (
+                  <Bar key={s} dataKey={s} name={SCHOOLS[s].label} fill={SCHOOLS[s].color} radius={[0, 4, 4, 0]} maxBarSize={16}>
+                    <LabelList dataKey={s} position="right" fill={T.muted} fontSize={10} formatter={(v) => (v > 0 ? v : "")} />
+                  </Bar>
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        ) : <Placeholder label="Nenhum lead qualificado em aberto" />}
+        <DataTable
+          columns={[
+            { key: "school", label: "Escola", render: (r) => <SchoolTag school={r.school} /> },
+            { key: "grupo", label: "Situação", style: { whiteSpace: "normal", minWidth: 175 } },
+            { key: "leads", label: "Leads", render: (r) => num(r.leads) },
+            { key: "valor", label: "Valor", render: (r) => brl(r.valor) },
+            { key: "valor_ponderado", label: "Forecast", render: (r) => brl(r.valor_ponderado) },
+            { key: "dias_medio", label: "Dias parados (média)", render: (r) => num(r.dias_medio) },
+          ]}
+          rows={grupos}
+          initialSort={{ key: "grupo", dir: "asc" }}
+          pageSize={10}
+        />
+      </Panel>
+
+      <Panel title={<span>Aging — há quanto tempo cada oportunidade está parada<Info texto="Dias desde a última atualização do lead no Kommo. Oportunidades paradas há mais de 14 dias raramente convertem: são candidatas a retomada ativa ou descarte, para o forecast não ficar inflado." /></span>}>
+        <DataTable
+          columns={[
+            { key: "school", label: "Escola", render: (r) => <SchoolTag school={r.school} /> },
+            { key: "grupo", label: "Situação", style: { whiteSpace: "normal", minWidth: 175 } },
+            { key: "d0_3", label: "0–3 dias", render: (r) => num(r.d0_3) },
+            { key: "d4_7", label: "4–7 dias", render: (r) => num(r.d4_7) },
+            { key: "d8_14", label: "8–14 dias", render: (r) => num(r.d8_14) },
+            { key: "d15_mais", label: "15+ dias", render: (r) => <span style={{ color: r.d15_mais > 0 ? T.red : T.muted, fontWeight: r.d15_mais > 0 ? 600 : 400 }}>{num(r.d15_mais)}</span> },
+          ]}
+          rows={aging}
+          initialSort={{ key: "d15_mais", dir: "desc" }}
+          pageSize={10}
+        />
+      </Panel>
+    </div>
+  );
+}
+
 // ═══════════════ MENU 2: MARKETING ═══════════════
 function MenuMarketing({ mkt, qual, orig, schools }) {
   const [canalSel, setCanalSel] = useState(null);
@@ -2503,6 +2605,7 @@ function periodoRange(id) {
 
 const ABAS = [
   { id: "visao", label: "Visão Geral" },
+  { id: "pipeline", label: "Pipeline & Contato" },
   { id: "origem", label: "Origem, Canal & Região" },
   { id: "jornada", label: "Jornada & Origem" },
   { id: "metas", label: "Metas & Comissões" },
@@ -2540,6 +2643,7 @@ export default function DashboardEdilvo() {
   const [fila, setFila] = useState(null);
   const [reg, setReg] = useState(null);
   const [orig, setOrig] = useState(null);
+  const [pipe, setPipe] = useState(null);
   const [data, setData] = useState(LIVE ? null : SNAPSHOT);
   const [mkt, setMkt] = useState(null);
   const [extra, setExtra] = useState(null);
@@ -2584,9 +2688,10 @@ export default function DashboardEdilvo() {
       rpc("dashboard_fila", { p_token: RPC_TOKEN, p_from: from, p_to: to }),
       rpc("dashboard_regiao_curso", { p_token: RPC_TOKEN, p_from: from, p_to: to }),
       rpc("dashboard_origem_detalhe", { p_token: RPC_TOKEN, p_from: from, p_to: to }),
+      rpc("dashboard_pipeline", { p_token: RPC_TOKEN, p_from: from, p_to: to }),
     ])
-      .then(([j, m, x, w, s, jo, q, fl, rg, od]) => {
-        setQual(q); setFila(fl); setReg(rg); setOrig(od);
+      .then(([j, m, x, w, s, jo, q, fl, rg, od, pp]) => {
+        setQual(q); setFila(fl); setReg(rg); setOrig(od); setPipe(pp);
         if (w) { j = { ...j, vendedores: w.vendedores, cursos: w.cursos, faixas: w.faixas, vendedores_coorte: w.vendedores_coorte }; }
         setData(j); setMkt(m); setExtra(x); setSdr(s); setJor(jo); setLoading(false);
       })
@@ -2706,6 +2811,7 @@ export default function DashboardEdilvo() {
                 {menu === "comercial" && (
                   <>
                     {aba === "visao" && <AbaVisaoGeral data={data} extra={extra} qual={qual} fila={fila} schools={schools} />}
+                    {aba === "pipeline" && <AbaPipeline pipe={pipe} schools={schools} />}
                     {aba === "funil" && <AbaFunilPerdas data={data} schools={schools} />}
                     {aba === "vendedores" && <AbaVendedores data={data} schools={schools} />}
                     {aba === "origem" && <AbaOrigem data={data} extra={extra} reg={reg} schools={schools} />}
