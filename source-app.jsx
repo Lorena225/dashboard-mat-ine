@@ -2493,18 +2493,6 @@ function MenuHome({ data, mkt, extra, qual, schools, goTo }) {
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
-      <Panel>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 18, flexWrap: "wrap" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 22, flexWrap: "wrap" }}>
-            <img src="https://ineprotec.com.br/img/logo-ineprotec.webp" alt="Ineprotec" style={{ height: 42 }} onError={(e) => { e.target.style.display = "none"; }} />
-            <span style={{ width: 1, height: 32, background: T.border }} />
-            <img src="https://matriculaead-landing.vercel.app/images/logo.png" alt="Matrícula EAD" style={{ height: 42 }} onError={(e) => { e.target.style.display = "none"; }} />
-          </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {schools.map((s) => <SchoolTag key={s} school={s} />)}
-          </div>
-        </div>
-      </Panel>
       <Panel title="Painel de metas do mês">
         {budgets.length ? (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
