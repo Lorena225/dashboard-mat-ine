@@ -1420,7 +1420,7 @@ function AbaFinanceiro({ data, schools }) {
         ) : <Placeholder label="Sem matrículas com curso no período" />}
       </Panel>
 
-      <Panel title="Ranking de cursos (matrículas, faturamento e ticket)">
+      <Panel title={<span>Ranking de cursos (matrículas, faturamento e ticket)<Info texto="Matrícula = lead na etapa MATRÍCULA REALIZADA com data de fechamento dentro do período. Um lead com mais de um curso conta em cada curso e a receita é rateada entre eles, por isso a soma dos cursos pode diferir do faturamento total. Ticket = faturamento ÷ matrículas do curso." /></span>}>
         <DataTable
           columns={[
             { key: "school", label: "Escola", render: (r) => <SchoolTag school={r.school} /> },
@@ -1428,7 +1428,6 @@ function AbaFinanceiro({ data, schools }) {
             { key: "matriculas", label: "Matrículas", render: (r) => num(r.matriculas) },
             { key: "faturamento", label: "Faturamento", render: (r) => brl(r.faturamento) },
             { key: "ticket_medio", label: "Ticket médio", render: (r) => brl(r.ticket_medio) },
-            { key: "leads", label: "Fechamentos", render: (r) => num(r.leads) },
           ]}
           rows={cursosRows}
           initialSort={{ key: "faturamento", dir: "desc" }}
@@ -2431,20 +2430,22 @@ const PERIODOS = [
 ];
 
 function periodoRange(id) {
+  // datas no fuso local (America/Sao_Paulo no navegador do usuário), nunca em UTC
   const now = new Date();
-  const iso = (d) => d.toISOString().slice(0, 10);
-  const day = 24 * 3600 * 1000;
-  if (id === "7d") return { from: iso(new Date(now - 7 * day)), to: iso(new Date(+now + day)) };
-  if (id === "14d") return { from: iso(new Date(now - 14 * day)), to: iso(new Date(+now + day)) };
-  if (id === "30d") return { from: iso(new Date(now - 30 * day)), to: iso(new Date(+now + day)) };
+  const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const hoje = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const maisDias = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+  // "to" é exclusivo: amanhã inclui o dia de hoje inteiro
+  const amanha = maisDias(hoje, 1);
+  if (id === "7d") return { from: iso(maisDias(hoje, -6)), to: iso(amanha) };   // 7 dias contando hoje
+  if (id === "14d") return { from: iso(maisDias(hoje, -13)), to: iso(amanha) };
+  if (id === "30d") return { from: iso(maisDias(hoje, -29)), to: iso(amanha) };
   if (id === "mes_anterior") {
-    const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const end = new Date(now.getFullYear(), now.getMonth(), 1);
-    return { from: iso(first), to: iso(end) };
+    return { from: iso(new Date(now.getFullYear(), now.getMonth() - 1, 1)), to: iso(new Date(now.getFullYear(), now.getMonth(), 1)) };
   }
-  const first = new Date(now.getFullYear(), now.getMonth(), 1);
-  return { from: iso(first), to: iso(new Date(+now + day)) };
+  return { from: iso(new Date(now.getFullYear(), now.getMonth(), 1)), to: iso(amanha) };
 }
+
 
 const ABAS = [
   { id: "visao", label: "Visão Geral" },
@@ -2500,9 +2501,16 @@ export default function DashboardEdilvo() {
     } else ({ from, to } = periodoRange(periodo));
     setLoading(true); setError(null); setPeriodoAtualFrom(from);
     try {
-      const dFrom = new Date(from), dTo = new Date(to);
-      const dur = dTo - dFrom;
-      const pFrom = new Date(dFrom - dur), pTo = new Date(dFrom - 86400000);
+      const dFrom = new Date(from + "T00:00:00"), dTo = new Date(to + "T00:00:00");
+      let pFrom, pTo;
+      if (dFrom.getDate() === 1) { // mês: compara com o mesmo intervalo de dias do mês anterior
+        pFrom = new Date(dFrom.getFullYear(), dFrom.getMonth() - 1, 1);
+        const fim = new Date(dTo.getFullYear(), dTo.getMonth() - 1, dTo.getDate());
+        pTo = new Date(Math.min(fim, dFrom) - 86400000);
+      } else {
+        const dur = dTo - dFrom;
+        pFrom = new Date(dFrom - dur); pTo = new Date(dFrom - 86400000);
+      }
       const fmt = (d) => d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
       PREV_LABEL = `${fmt(pFrom)} a ${fmt(pTo)}`;
     } catch (e) { PREV_LABEL = ""; }
