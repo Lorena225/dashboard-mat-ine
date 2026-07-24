@@ -539,7 +539,7 @@ function AbaVisaoGeral({ data, extra, qual, fila, schools }) {
         <div style={{ fontSize: 11.5, color: T.muted, marginTop: 10, lineHeight: 1.6 }}>
           {modoFunil === "atual"
             ? "Fotografia de agora: onde estão todos os leads em aberto neste momento, com o valor potencial de cada etapa. Independe do filtro de período — serve para o supervisor decidir a ação do dia."
-            : "Apenas os leads criados dentro do período filtrado, incluindo os já ganhos e perdidos — serve para avaliar o desempenho daquela safra de leads."}
+            : "Todos os leads criados dentro do período filtrado, incluindo ganhos, perdidos e os que migraram para outros funis (linha \"Outros funis\"). A soma das etapas fecha exatamente com o total de leads entrados no período."}
         </div>
       </Panel>
       <Panel title="Entrada de leads × matrículas por dia">
@@ -783,7 +783,12 @@ function AbaFunilPerdas({ data, schools }) {
         })()}
       </Panel>
 
-      <Panel title="Ranking de motivos por etapa — selecione a etapa">
+      <Panel title={<span>Ranking de motivos por etapa<Info texto="Base: perdas do período cuja etapa de saída foi capturada pelo histórico de mudanças de status (webhook ativo desde 14/07/2026). Perdas anteriores a essa data, ou registradas sem passagem de etapa, aparecem no ranking geral de motivos mas não aqui — por isso o total desta seção é menor. Cada lead conta uma vez, pela última perda." /></span>}
+        right={(() => {
+          const comEtapa = sum(heat.filter((h) => schools.includes(h.school)), "qtd");
+          const total = sum(data.motivos_perda.filter((m) => schools.includes(m.school)), "qtd");
+          return <span style={{ fontSize: 11.5, color: T.muted }}>{num(comEtapa)} de {num(total)} perdas com etapa identificada</span>;
+        })()}>
         {(() => {
           const base = heat.filter((h) => schools.includes(h.school));
           if (!base.length) return <Placeholder label="Sem histórico de etapa da perda no período" detail="A etapa em que o lead foi perdido vem do histórico de mudanças de status (webhook), coletado desde 14/07/2026." />;
