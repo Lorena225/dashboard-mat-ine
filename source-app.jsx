@@ -957,6 +957,7 @@ function AbaFunilPerdas({ data, schools }) {
 function AbaVendedores({ data, schools }) {
   const [selVend, setSelVend] = useState("todos");
   const [indicador, setIndicador] = useState("todos");
+  const [visao, setVisao] = useState("producao");
   const rows0 = data.vendedores
     .filter((v) => schools.includes(v.school))
     .map((v) => ({ ...v, conversao: v.leads_atribuidos > 0 ? v.matriculas / v.leads_atribuidos : 0 }));
@@ -1042,13 +1043,25 @@ function AbaVendedores({ data, schools }) {
         ) : <Placeholder label="Sem matrículas no período" />}
         {schools.length > 1 && <div style={{ fontSize: 11.5, color: T.muted, marginTop: 8 }}>Vendedores que atendem as duas escolas aparecem em uma única barra: cada cor é uma escola, com o número dentro do segmento, e o total à direita.</div>}
       </Panel>
-      <Panel title="Ranking consolidado de desempenho" right={
+      <Panel title={<span>{visao === "producao" ? "Ranking por produção (fechamentos no período)" : "Ranking por eficiência (coorte de leads do período)"}
+        <Info texto={visao === "producao"
+          ? "Conta matrículas FECHADAS dentro do período, mesmo que o lead tenha entrado meses antes. Mede entrega e é a base da comissão. Não use a conversão desta visão: o denominador (leads criados no período) é outra população."
+          : "Acompanha apenas os leads CRIADOS no período e o que aconteceu com eles até hoje: quantos já fecharam, quantos foram perdidos e quantos seguem em aberto. É a visão correta para comparar eficiência entre vendedores, porque numerador e denominador são a mesma população. Vendedores com menos de 10 leads na coorte ficam fora do ranking por falta de amostra."} /></span>}
+        right={
+        <span style={{ display: "inline-flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+        <span style={{ display: "inline-flex", gap: 4 }}>
+          {[["producao", "Produção"], ["coorte", "Eficiência"]].map(([id, lab]) => (
+            <button key={id} onClick={() => setVisao(id)}
+              style={{ background: visao === id ? T.ink : "transparent", color: visao === id ? T.onInk : T.ink,
+                border: `1px solid ${visao === id ? T.ink : T.border}`, borderRadius: 7, padding: "5px 11px",
+                fontSize: 11.5, cursor: "pointer", fontFamily: font }}>{lab}</button>
+          ))}
+        </span>
         <select value={indicador} onChange={(e) => setIndicador(e.target.value)}
           style={{ background: T.panel, color: T.text, border: `1px solid ${T.border}`, borderRadius: 8, padding: "6px 10px", fontSize: 12, fontFamily: font, cursor: "pointer", maxWidth: 300 }}>
           <option value="todos">Todos os indicadores (índice ponderado)</option>
           <option value="matriculas">Matrículas efetivadas</option>
           <option value="faturamento">Faturamento gerado</option>
-          <option value="conversao">Taxa de conversão</option>
           <option value="ticket_medio">Ticket médio</option>
           <option value="velocidade">Velocidade de fechamento</option>
           <option value="leads_atribuidos">Volume de leads atendidos</option>
@@ -1056,9 +1069,45 @@ function AbaVendedores({ data, schools }) {
           <option value="" disabled>Tempo médio de resposta (requer Chats API)</option>
           <option value="" disabled>Fechamento no 1º contato (requer histórico de mensagens)</option>
           <option value="" disabled>Satisfação do lead (requer campo no Kommo)</option>
-        </select>}>
+        </select></span>}>
         {(() => {
           // consolida o vendedor entre as escolas
+          if (visao === "coorte") {
+            const co = (data.vendedores_coorte || []).filter((v) => schools.includes(v.school) && !ehGenerico(v));
+            const nomesC = [...new Set(co.map((v) => v.vendedor))];
+            const cons = nomesC.map((nome) => {
+              const rs = co.filter((v) => v.vendedor === nome);
+              const leads = sum(rs, "leads_coorte"), ganhos = sum(rs, "ganhos_coorte");
+              const perdidos = sum(rs, "perdidos_coorte"), abertos = sum(rs, "abertos_coorte");
+              const decididos = ganhos + perdidos;
+              return { vendedor: nome, leads, ganhos, perdidos, abertos, receita: sum(rs, "receita_coorte"),
+                conversao: leads > 0 ? ganhos / leads : 0, aproveitamento: decididos > 0 ? ganhos / decididos : null };
+            }).filter((v) => v.leads >= 10).sort((a, b) => b.conversao - a.conversao);
+            if (!cons.length) return <Placeholder label="Nenhum vendedor com 10+ leads na coorte do período" detail="Amostra pequena demais para comparar eficiência — amplie o período." />;
+            const maxConv = Math.max(...cons.map((v) => v.conversao), 0.0001);
+            return (
+              <>
+                <div style={{ display: "grid", gap: 8 }}>
+                  {cons.map((v, i) => (
+                    <div key={v.vendedor} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", background: i < 3 ? T.panelSoft : "transparent", border: `1px solid ${i < 3 ? T.border : "transparent"}`, borderRadius: 8, flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 14, width: 28, textAlign: "center" }}>{i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}º`}</span>
+                      <span style={{ fontSize: 12.5, fontWeight: i < 3 ? 600 : 400, minWidth: 140 }}>{v.vendedor}</span>
+                      <div style={{ flex: 1, height: 8, background: T.panelSoft, borderRadius: 4, overflow: "hidden", minWidth: 60 }}>
+                        <div style={{ width: `${Math.max(2, v.conversao / maxConv * 100)}%`, height: "100%", background: i === 0 ? T.green : T.steel, borderRadius: 4 }} />
+                      </div>
+                      <span style={{ fontSize: 12.5, fontWeight: 600, minWidth: 62, textAlign: "right" }}>{pct(v.conversao)}</span>
+                      <span style={{ fontSize: 11, color: T.muted, minWidth: 210, textAlign: "right" }}>
+                        {num(v.ganhos)} de {num(v.leads)} leads · {num(v.abertos)} em aberto · {brl(v.receita)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontSize: 11.5, color: T.muted, marginTop: 10, lineHeight: 1.6 }}>
+                  Mesma população no numerador e no denominador: leads criados no período por responsável. "Em aberto" ainda pode converter, então a taxa tende a subir com o tempo — compare períodos fechados para leitura justa. Leads na fila automática não entram.
+                </div>
+              </>
+            );
+          }
           const nomesV = [...new Set(rows.map((v) => v.vendedor))];
           const cons = nomesV.map((nome) => {
             const rs = rows.filter((v) => v.vendedor === nome);
@@ -1084,7 +1133,7 @@ function AbaVendedores({ data, schools }) {
             const mx = Math.max(...vals), mn = Math.min(...vals);
             return (v) => (mx === mn ? (mx > 0 ? 100 : 0) : ((Number(v[campo]) || 0) - mn) / (mx - mn) * 100);
           };
-          const pesos = [["matriculas", 0.35], ["conversao", 0.25], ["faturamento", 0.20], ["ticket_medio", 0.10], ["velocidade", 0.10]];
+          const pesos = [["matriculas", 0.45], ["faturamento", 0.30], ["ticket_medio", 0.15], ["velocidade", 0.10]];
           const normalizadores = Object.fromEntries(pesos.map(([c]) => [c, norm(c)]));
           const comScore = cons.map((v) => ({ ...v, score: Math.round(pesos.reduce((a, [c, p]) => a + normalizadores[c](v) * p, 0) * 10) / 10 }));
 
@@ -1114,14 +1163,14 @@ function AbaVendedores({ data, schools }) {
                     </div>
                     <span style={{ fontSize: 12.5, fontWeight: 600, minWidth: 92, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmt(v)}</span>
                     <span style={{ fontSize: 11, color: T.muted, minWidth: 130, textAlign: "right" }}>
-                      {String(v.matriculas).replace(".", ",")} matr · {pct(v.conversao)} conv
+                      {String(v.matriculas).replace(".", ",")} matrículas · {brl(v.faturamento)}
                     </span>
                   </div>
                 ))}
               </div>
               <div style={{ fontSize: 11.5, color: T.muted, marginTop: 10, lineHeight: 1.6 }}>
                 {indicador === "todos"
-                  ? "Índice ponderado (0 a 100), calculado sobre o desempenho relativo do grupo no período: matrículas 35%, conversão 25%, faturamento 20%, ticket médio 10% e velocidade de fechamento 10%. Vendedores que atendem as duas escolas entram com os números somados."
+                  ? "Índice ponderado (0 a 100) sobre o desempenho relativo do grupo: matrículas 45%, faturamento 30%, ticket médio 15% e velocidade de fechamento 10%. Só usa métricas de produção — a conversão saiu do índice porque misturava populações (matrículas fechadas no período com leads criados no período). Para comparar eficiência, use a visão Eficiência."
                   : `Ordenado por ${rotulos[chaveOrd] || chaveOrd}. Use "Todos os indicadores" para o ranking equilibrado, que evita premiar volume sem conversão ou conversão sem volume.`}
               </div>
               <div style={{ fontSize: 11, color: T.muted, marginTop: 6 }}>
@@ -2538,7 +2587,7 @@ export default function DashboardEdilvo() {
     ])
       .then(([j, m, x, w, s, jo, q, fl, rg, od]) => {
         setQual(q); setFila(fl); setReg(rg); setOrig(od);
-        if (w) { j = { ...j, vendedores: w.vendedores, cursos: w.cursos, faixas: w.faixas }; }
+        if (w) { j = { ...j, vendedores: w.vendedores, cursos: w.cursos, faixas: w.faixas, vendedores_coorte: w.vendedores_coorte }; }
         setData(j); setMkt(m); setExtra(x); setSdr(s); setJor(jo); setLoading(false);
       })
       .catch((e) => { setError(String(e.message)); setLoading(false); });
