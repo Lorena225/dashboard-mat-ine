@@ -14,6 +14,13 @@ const MAT = {
     { escola: "ineprotec", leads: 78, matriculas: 78.0, faturamento: 181166, ticket_medio: 2322.64 },
     { escola: "matricula_ead", leads: 46, matriculas: 46.0, faturamento: 104604, ticket_medio: 2274.0 },
   ],
+  // Nome normalizado (mesmo da aba Vendedores) para os dois recortes casarem.
+  por_vendedor: [
+    { vendedor: "Jessica Alves Torres", matriculas: 48.0, leads: 48, faturamento: 120670, compartilhadas: 0,
+      escolas: { ineprotec: { matriculas: 43.0, faturamento: 108000 }, matricula_ead: { matriculas: 5.0, faturamento: 12670 } } },
+    { vendedor: "Bruna Pereira Benevides", matriculas: 29.5, leads: 30, faturamento: 65765, compartilhadas: 1,
+      escolas: { matricula_ead: { matriculas: 28.5, faturamento: 63000 } } },
+  ],
   // Usuarios atendem as duas escolas: a quebra vem aninhada em `escolas`.
   por_atendente: [
     { atendente: "INE - JESSICA ALVES", matriculas: 48.0, leads: 48, faturamento: 120670, compartilhadas: 0, ticket_medio: 2513.96,
@@ -24,9 +31,9 @@ const MAT = {
       escolas: { ineprotec: { matriculas: 2.0, faturamento: 5113 } } },
   ],
   lista: [
-    { lead_id: 34353712, aluno: "MAIK MATHEUS XAVIER DIAS DE MOURA", escola: "ineprotec", atendente: "INE - MARCELA RABELO", atendentes_no_lead: 1, credito: 1.0, valor: 2400, valor_credito: 2400, curso: "Tecnico em Enfermagem", data_matricula: "2026-07-31T17:40:55+00:00", base_data: "Entrada em MATRICULA REALIZADA" },
-    { lead_id: 34261482, aluno: "RENATO DE SOUZA MONTEIRO", escola: "matricula_ead", atendente: "MAT - BRUNA PEREIRA", atendentes_no_lead: 2, credito: 0.5, valor: 2200, valor_credito: 1100, curso: null, data_matricula: "2026-07-31T17:29:31+00:00", base_data: "DATA PAGAMENTO MATRICULA" },
-    { lead_id: 34174236, aluno: "ARIELA CARRARO", escola: "ineprotec", atendente: "(sem registro de atendimento)", atendentes_no_lead: 1, credito: 1.0, valor: 2513, valor_credito: 2513, curso: "Radiologia", data_matricula: "2026-07-31T11:32:12+00:00", base_data: "Fechamento do lead" },
+    { lead_id: 34353712, aluno: "MAIK MATHEUS XAVIER DIAS DE MOURA", escola: "ineprotec", atendente: "INE - MARCELA RABELO", vendedor: "Marcela Rabelo do Carmo", atendentes_no_lead: 1, credito: 1.0, valor: 2400, valor_credito: 2400, curso: "Tecnico em Enfermagem", data_matricula: "2026-07-31T17:40:55+00:00", base_data: "Entrada em MATRICULA REALIZADA" },
+    { lead_id: 34261482, aluno: "RENATO DE SOUZA MONTEIRO", escola: "matricula_ead", atendente: "MAT - BRUNA PEREIRA", vendedor: "Bruna Pereira Benevides", atendentes_no_lead: 2, credito: 0.5, valor: 2200, valor_credito: 1100, curso: null, data_matricula: "2026-07-31T17:29:31+00:00", base_data: "DATA PAGAMENTO MATRICULA" },
+    { lead_id: 34174236, aluno: "ARIELA CARRARO", escola: "ineprotec", atendente: "(sem registro de atendimento)", vendedor: "(sem registro de atendimento)", atendentes_no_lead: 1, credito: 1.0, valor: 2513, valor_credito: 2513, curso: "Radiologia", data_matricula: "2026-07-31T11:32:12+00:00", base_data: "Fechamento do lead" },
   ],
   diagnostico: { total_matriculas: 124.0, total_leads: 124, por_data_pagamento: 0, por_entrada_status: 105, por_fechamento: 19, sem_atendente: 2, compartilhadas: 1 },
 };
@@ -143,6 +150,19 @@ passos.push(["abriu a quebra por escola de cada usuário",
 passos.push(["rateou a matrícula dividida no total do usuário",
   !!bru && bru[1] === "28,5" && bru[2] === "1" && bru[3] === "29,5"]);
 passos.push(["não classificou usuário por prefixo", !/escola do atendente/i.test(t2)]);
+
+const okVend = clicar("Vendedores");
+await new Promise((r) => setTimeout(r, 600));
+const t3 = root.textContent || "";
+passos.push(["abriu a aba Vendedores", okVend]);
+passos.push(["trouxe o relatório para o fim da aba Vendedores", /Matrículas por vendedor · detalhe/.test(t3)]);
+passos.push(["agrupou pelo nome normalizado do vendedor",
+  /Jessica Alves Torres/.test(t3) && /Bruna Pereira Benevides/.test(t3)]);
+passos.push(["manteve os nomes dos alunos no relatório", /MAIK MATHEUS/.test(t3)]);
+// o relatorio precisa ser o ultimo bloco: nada de painel depois dele
+const paineis = [...w.document.querySelectorAll("h2")].map((h) => (h.textContent || "").trim());
+passos.push(["posicionou o relatório como último bloco da página",
+  /Matrículas por vendedor/.test(paineis[paineis.length - 1] || "")]);
 
 let falhou = false;
 for (const [nome, ok] of passos) {

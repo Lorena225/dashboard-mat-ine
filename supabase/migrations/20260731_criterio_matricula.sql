@@ -34,7 +34,8 @@ returns table (
   lead_id            bigint,
   aluno              text,
   escola             text,
-  atendente          text,
+  atendente          text,   -- nome cru do Registro de Atendimento (auditoria no Kommo)
+  vendedor           text,   -- mesmo nome usado na aba Vendedores (mapeado em kommo_users)
   atendentes_no_lead int,
   credito            numeric,
   valor              numeric,
@@ -99,6 +100,14 @@ as $$
     coalesce(nullif(btrim(e.name), ''), '(sem nome)'),
     e.school,
     coalesce(e.nome, '(sem registro de atendimento)'),
+    coalesce(
+      (select u2.name from kommo_users u2
+        where upper(u2.name) like
+              upper(regexp_replace(e.nome, '^(MAT|INE)\s*-\s*', '', 'i')) || '%'
+        limit 1),
+      nullif(initcap(regexp_replace(coalesce(e.nome, ''), '^(MAT|INE)\s*-\s*', '', 'i')), ''),
+      '(sem registro de atendimento)'
+    ),
     e.n_at::int,
     round(1.0 / e.n_at, 4),
     coalesce(e.price, 0),
@@ -112,21 +121,17 @@ $$;
 grant execute on function public.matriculas_periodo(timestamptz, timestamptz)
   to anon, authenticated, service_role;
 
--- ── RPC do painel ──
+-- ── RPC consumida pelo painel ──
+-- `por_atendente` usa o nome cru do Registro de Atendimento (auditoria no Kommo).
+-- `por_vendedor`  usa o nome normalizado, igual ao da aba Vendedores, para o
+--                 relatorio casar com o ranking exibido acima dele na mesma pagina.
 create or replace function public.dashboard_matriculas(
-  p_token  text,
-  p_from   timestamptz,
-  p_to     timestamptz,
-  p_school text default null
+  p_token text, p_from timestamptz, p_to timestamptz, p_school text default null
 )
 returns jsonb
-language plpgsql
-stable
-security definer
-set search_path to 'public'
+language plpgsql stable security definer set search_path to 'public'
 as $function$
-declare
-  result jsonb;
+declare result jsonb;
 begin
   if p_token <> 'ba37d3f35fb8c1dbef36184f0c0c1afc157dde7b' then
     raise exception 'unauthorized';
@@ -137,63 +142,72 @@ begin
     where p_school is null or escola = p_school
   ),
   por_escola as (
-    select escola,
-           round(sum(credito), 2)       as matriculas,
-           count(distinct lead_id)      as leads,
-           round(sum(valor_credito), 2) as faturamento,
-           case when sum(credito) > 0
-                then round(sum(valor_credito) / sum(credito), 2)
-                else 0 end              as ticket_medio
+    select escola, round(sum(credito),2) as matriculas, count(distinct lead_id) as leads,
+           round(sum(valor_credito),2) as faturamento,
+           case when sum(credito)>0 then round(sum(valor_credito)/sum(credito),2) else 0 end as ticket_medio
     from m group by escola
   ),
   at_escola as (
-    select atendente, escola,
-           round(sum(credito), 2)       as matriculas,
-           round(sum(valor_credito), 2) as faturamento
-    from m group by 1, 2
+    select atendente, escola, round(sum(credito),2) as matriculas, round(sum(valor_credito),2) as faturamento
+    from m group by 1,2
   ),
   escolas_agg as (
-    select atendente,
-           jsonb_object_agg(escola, jsonb_build_object(
+    select atendente, jsonb_object_agg(escola, jsonb_build_object(
              'matriculas', matriculas, 'faturamento', faturamento)) as escolas
     from at_escola group by atendente
   ),
   at_total as (
-    select atendente,
-           round(sum(credito), 2)                         as matriculas,
-           count(distinct lead_id)                        as leads,
-           round(sum(valor_credito), 2)                   as faturamento,
+    select atendente, max(vendedor) as vendedor,
+           round(sum(credito),2) as matriculas, count(distinct lead_id) as leads,
+           round(sum(valor_credito),2) as faturamento,
            count(*) filter (where atendentes_no_lead > 1) as compartilhadas,
-           case when sum(credito) > 0
-                then round(sum(valor_credito) / sum(credito), 2)
-                else 0 end                                as ticket_medio
+           case when sum(credito)>0 then round(sum(valor_credito)/sum(credito),2) else 0 end as ticket_medio
     from m group by atendente
   ),
   por_atendente as (
     select t.*, coalesce(e.escolas, '{}'::jsonb) as escolas
     from at_total t left join escolas_agg e on e.atendente = t.atendente
   ),
+  vend_escola as (
+    select vendedor, escola, round(sum(credito),2) as matriculas, round(sum(valor_credito),2) as faturamento
+    from m group by 1,2
+  ),
+  vend_escolas_agg as (
+    select vendedor, jsonb_object_agg(escola, jsonb_build_object(
+             'matriculas', matriculas, 'faturamento', faturamento)) as escolas
+    from vend_escola group by vendedor
+  ),
+  vend_total as (
+    select vendedor, round(sum(credito),2) as matriculas, count(distinct lead_id) as leads,
+           round(sum(valor_credito),2) as faturamento,
+           count(*) filter (where atendentes_no_lead > 1) as compartilhadas
+    from m group by vendedor
+  ),
+  por_vendedor as (
+    select t.*, coalesce(e.escolas, '{}'::jsonb) as escolas
+    from vend_total t left join vend_escolas_agg e on e.vendedor = t.vendedor
+  ),
   lista as (
-    select lead_id, aluno, escola, atendente, atendentes_no_lead,
+    select lead_id, aluno, escola, atendente, vendedor, atendentes_no_lead,
            credito, valor, valor_credito, curso, data_matricula, base_data
     from m
   ),
   diag as (
-    select
-      round(sum(credito), 2)                                                            as total_matriculas,
-      count(distinct lead_id)                                                           as total_leads,
-      count(distinct lead_id) filter (where base_data = 'DATA PAGAMENTO MATRICULA')      as por_data_pagamento,
-      count(distinct lead_id) filter (where base_data = 'Entrada em MATRICULA REALIZADA') as por_entrada_status,
-      count(distinct lead_id) filter (where base_data = 'Fechamento do lead')             as por_fechamento,
-      count(distinct lead_id) filter (where atendente = '(sem registro de atendimento)')  as sem_atendente,
-      count(distinct lead_id) filter (where atendentes_no_lead > 1)                       as compartilhadas
+    select round(sum(credito),2) as total_matriculas,
+      count(distinct lead_id) as total_leads,
+      count(distinct lead_id) filter (where base_data='DATA PAGAMENTO MATRICULA') as por_data_pagamento,
+      count(distinct lead_id) filter (where base_data='Entrada em MATRICULA REALIZADA') as por_entrada_status,
+      count(distinct lead_id) filter (where base_data='Fechamento do lead') as por_fechamento,
+      count(distinct lead_id) filter (where atendente='(sem registro de atendimento)') as sem_atendente,
+      count(distinct lead_id) filter (where atendentes_no_lead>1) as compartilhadas
     from m
   )
   select jsonb_build_object(
     'periodo',       jsonb_build_object('from', p_from, 'to', p_to),
     'por_escola',    (select coalesce(jsonb_agg(to_jsonb(x) order by x.matriculas desc), '[]') from por_escola x),
     'por_atendente', (select coalesce(jsonb_agg(to_jsonb(x) order by x.matriculas desc), '[]') from por_atendente x),
-    'lista',         (select coalesce(jsonb_agg(to_jsonb(x) order by x.atendente, x.data_matricula), '[]') from lista x),
+    'por_vendedor',  (select coalesce(jsonb_agg(to_jsonb(x) order by x.matriculas desc), '[]') from por_vendedor x),
+    'lista',         (select coalesce(jsonb_agg(to_jsonb(x) order by x.vendedor, x.data_matricula), '[]') from lista x),
     'diagnostico',   (select to_jsonb(d) from diag d)
   ) into result;
 

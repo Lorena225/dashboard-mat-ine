@@ -954,7 +954,7 @@ function AbaFunilPerdas({ data, schools }) {
 }
 
 // ── Aba 3: Performance por Vendedor ──
-function AbaVendedores({ data, schools }) {
+function AbaVendedores({ data, schools, mat }) {
   const [selVend, setSelVend] = useState("todos");
   const [indicador, setIndicador] = useState("todos");
   const [visao, setVisao] = useState("producao");
@@ -1210,6 +1210,8 @@ function AbaVendedores({ data, schools }) {
         <Placeholder label="Métrica em construção" detail="Ativada junto com o histórico de interações — mesma dependência da aba Funil & Perdas." />
       </Panel>
       <div style={{ fontSize: 11.5, color: T.muted }}>Matrícula = lead na etapa MATRÍCULA REALIZADA dos funis de venda, no período pesquisado (ALUNO FORMADO não conta). Com mais de um atendente no "Registro de Atendimento", a matrícula é rateada igualmente entre eles (por isso podem aparecer valores como 2,5). "Fechamento (dias)" = tempo médio entre a criação do lead e a matrícula.</div>
+
+      <RelatorioNominalMatriculas mat={mat} agruparPor="vendedor" />
     </div>
   );
 }
@@ -2627,6 +2629,123 @@ function periodoRange(id) {
 }
 
 
+// ── Relatório nominal de matrículas ──
+// Usado em duas telas: na aba Matrículas & Auditoria (agrupado pelo nome cru do
+// Registro de Atendimento, que é como se confere no Kommo) e no fim da aba
+// Vendedores (agrupado pelo nome normalizado do vendedor, para casar com o
+// ranking que aparece acima dele na mesma página).
+function RelatorioNominalMatriculas({ mat, agruparPor = "atendente" }) {
+  const [filtro, setFiltro] = useState("todos");
+
+  const porVendedor = agruparPor === "vendedor";
+  const rotuloPessoa = porVendedor ? "Vendedor" : "Atendente";
+  const titulo = porVendedor ? "Matrículas por vendedor · detalhe" : "Relatório nominal · auditoria";
+
+  if (!mat) {
+    return <Panel title={titulo}><Placeholder label="Carregando matrículas…" /></Panel>;
+  }
+
+  const lista = mat.lista || [];
+  const pessoas = (porVendedor ? mat.por_vendedor : mat.por_atendente) || [];
+  const campo = porVendedor ? "vendedor" : "atendente";
+
+  const moeda = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+  const dec = (v) => Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  const dataBR = (s) => (s ? new Date(s).toLocaleDateString("pt-BR") : "—");
+
+  const filtrada = filtro === "todos" ? lista : lista.filter((r) => r[campo] === filtro);
+
+  const baixarCSV = () => {
+    const cab = ["Lead ID", "Aluno", "Escola", "Vendedor", "Registro de Atendimento",
+      "Atendentes no lead", "Crédito", "Valor do lead", "Valor rateado", "Curso",
+      "Data da matrícula", "Base da data"];
+    const linhas = filtrada.map((r) => [
+      r.lead_id, r.aluno, (SCHOOLS[r.escola] || {}).label || r.escola,
+      r.vendedor, r.atendente, r.atendentes_no_lead,
+      dec(r.credito), dec(r.valor), dec(r.valor_credito),
+      r.curso || "", dataBR(r.data_matricula), r.base_data,
+    ]);
+    const csv = [cab, ...linhas]
+      .map((l) => l.map((c) => `"${String(c == null ? "" : c).replace(/"/g, '""')}"`).join(";"))
+      .join("\r\n");
+    const per = (mat.periodo || {}).from ? String(mat.periodo.from).slice(0, 10) : "periodo";
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `matriculas_${per}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+
+  const chip = (ativo) => ({
+    background: ativo ? T.ink : "transparent", color: ativo ? T.onInk : T.ink,
+    border: `1px solid ${ativo ? T.ink : T.border}`, borderRadius: 20, padding: "4px 11px",
+    fontSize: 11.5, fontWeight: 500, cursor: "pointer", fontFamily: font, whiteSpace: "nowrap",
+  });
+
+  const semDono = "(sem registro de atendimento)";
+
+  return (
+    <Panel
+      title={<>{titulo} <Info texto={`Todas as matrículas contadas no período, uma linha por aluno, com o ${rotuloPessoa.toLowerCase()} que recebeu o crédito e a base de data usada. É este relatório que permite conferir os números linha a linha contra o Kommo.`} /></>}
+      right={
+        <button onClick={baixarCSV} style={{
+          background: T.ink, color: T.onInk, border: "none", borderRadius: 8,
+          padding: "7px 14px", fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: font,
+        }}>Baixar CSV ({num(filtrada.length)})</button>
+      }
+    >
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+        <button onClick={() => setFiltro("todos")} style={chip(filtro === "todos")}>
+          Todos ({num(lista.length)})
+        </button>
+        {pessoas.map((p) => (
+          <button key={p[campo]} onClick={() => setFiltro(p[campo])} style={chip(filtro === p[campo])}>
+            {p[campo]} ({num(p.leads)})
+          </button>
+        ))}
+      </div>
+
+      <DataTable
+        rows={filtrada}
+        initialSort={{ key: "data_matricula", dir: "desc" }}
+        pageSize={15}
+        columns={[
+          { key: "aluno", label: "Aluno", render: (r) => <b style={{ fontWeight: 500 }}>{r.aluno}</b> },
+          { key: "escola", label: "Escola", render: (r) => <SchoolTag school={r.escola} /> },
+          {
+            key: campo, label: rotuloPessoa,
+            render: (r) => (r[campo] === semDono
+              ? <span style={{ color: T.red }}>{r[campo]}</span>
+              : <span title={porVendedor ? `Registro de Atendimento: ${r.atendente}` : undefined}>{r[campo]}</span>),
+          },
+          {
+            key: "credito", label: "Crédito", style: { textAlign: "right" },
+            render: (r) => (Number(r.atendentes_no_lead) > 1
+              ? <span style={{ color: T.amber, fontWeight: 600 }} title={`Dividida entre ${r.atendentes_no_lead} atendentes`}>{dec(r.credito)}</span>
+              : dec(r.credito)),
+          },
+          { key: "valor", label: "Valor", render: (r) => moeda(r.valor), style: { textAlign: "right" } },
+          { key: "curso", label: "Curso", render: (r) => r.curso || <span style={{ color: T.muted }}>—</span> },
+          { key: "data_matricula", label: "Data", render: (r) => dataBR(r.data_matricula), style: { whiteSpace: "nowrap" } },
+          {
+            key: "base_data", label: "Base da data",
+            render: (r) => (
+              <span style={{
+                fontSize: 10.5, padding: "2px 8px", borderRadius: 20,
+                background: r.base_data === "DATA PAGAMENTO MATRICULA" ? T.green + T.tint : T.amber + T.tint,
+                border: `1px solid ${r.base_data === "DATA PAGAMENTO MATRICULA" ? T.green : T.amber}${T.tintForte}`,
+                color: r.base_data === "DATA PAGAMENTO MATRICULA" ? T.green : T.amber, whiteSpace: "nowrap",
+              }}>{r.base_data}</span>
+            ),
+          },
+          { key: "lead_id", label: "Lead", render: (r) => <span style={{ color: T.muted, fontSize: 11 }}>{r.lead_id}</span> },
+        ]}
+      />
+    </Panel>
+  );
+}
+
 // ── Aba: Matrículas & Auditoria ──
 // Critério canônico de matrícula (definido com a operação em jul/2026):
 //   1. Data: campo DATA PAGAMENTO MATRICULA (cartão do contato) dentro do período.
@@ -2636,12 +2755,9 @@ function periodoRange(id) {
 //      o prefixo INE-/MAT- no nome do usuário é só parte do nome e não classifica nada —
 //      por isso o total de cada usuário vem aberto por escola.
 function AbaMatriculas({ mat, schools }) {
-  const [filtroAtendente, setFiltroAtendente] = useState("todos");
-
   if (!mat) return <Placeholder label="Carregando matrículas…" />;
 
   const diag = mat.diagnostico || {};
-  const lista = mat.lista || [];
   const porEscola = mat.por_escola || [];
 
   const totalLeads = Number(diag.total_leads || 0);
@@ -2649,7 +2765,6 @@ function AbaMatriculas({ mat, schools }) {
 
   const moeda = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
   const dec = (v) => Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-  const dataBR = (s) => (s ? new Date(s).toLocaleDateString("pt-BR") : "—");
 
   // A quebra por escola vem aninhada em `escolas`; achatamos para a tabela poder ordenar.
   const porAtendente = (mat.por_atendente || []).map((r) => {
@@ -2662,35 +2777,6 @@ function AbaMatriculas({ mat, schools }) {
     return linha;
   });
 
-  const listaFiltrada = filtroAtendente === "todos" ? lista : lista.filter((r) => r.atendente === filtroAtendente);
-
-  const baixarCSV = () => {
-    const cab = ["Lead ID", "Aluno", "Escola", "Atendente", "Atendentes no lead",
-      "Crédito", "Valor do lead", "Valor rateado", "Curso", "Data da matrícula", "Base da data"];
-    const linhas = listaFiltrada.map((r) => [
-      r.lead_id, r.aluno, (SCHOOLS[r.escola] || {}).label || r.escola, r.atendente,
-      r.atendentes_no_lead, dec(r.credito), dec(r.valor), dec(r.valor_credito),
-      r.curso || "", dataBR(r.data_matricula), r.base_data,
-    ]);
-    const csv = [cab, ...linhas]
-      .map((l) => l.map((c) => `"${String(c == null ? "" : c).replace(/"/g, '""')}"`).join(";"))
-      .join("\r\n");
-    const per = (mat.periodo || {}).from ? String(mat.periodo.from).slice(0, 10) : "periodo";
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `matriculas_auditoria_${per}.csv`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  };
-
-  const chip = (ativo) => ({
-    background: ativo ? T.ink : "transparent", color: ativo ? T.onInk : T.ink,
-    border: `1px solid ${ativo ? T.ink : T.border}`, borderRadius: 20, padding: "4px 11px",
-    fontSize: 11.5, fontWeight: 500, cursor: "pointer", fontFamily: font, whiteSpace: "nowrap",
-  });
-
-  // Atendente | (uma coluna por escola) | Total | Faturamento | Compartilhadas
   const colunasAtendente = [
     { key: "atendente", label: "Atendente" },
     ...schools.map((s) => ({
@@ -2775,59 +2861,7 @@ function AbaMatriculas({ mat, schools }) {
         </div>
       </Panel>
 
-      {/* ── Relatório nominal para auditoria ── */}
-      <Panel
-        title={<>Relatório nominal · auditoria <Info texto="Lista completa das matrículas contadas no período, nome a nome, com o usuário que recebeu o crédito e a base de data usada. É este relatório que permite conferir o painel linha a linha contra o Kommo." /></>}
-        right={
-          <button onClick={baixarCSV} style={{
-            background: T.ink, color: T.onInk, border: "none", borderRadius: 8,
-            padding: "7px 14px", fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: font,
-          }}>Baixar CSV ({num(listaFiltrada.length)})</button>
-        }
-      >
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
-          <button onClick={() => setFiltroAtendente("todos")} style={chip(filtroAtendente === "todos")}>
-            Todos ({num(lista.length)})
-          </button>
-          {porAtendente.map((a) => (
-            <button key={a.atendente} onClick={() => setFiltroAtendente(a.atendente)} style={chip(filtroAtendente === a.atendente)}>
-              {a.atendente} ({num(a.leads)})
-            </button>
-          ))}
-        </div>
-
-        <DataTable
-          rows={listaFiltrada}
-          initialSort={{ key: "data_matricula", dir: "desc" }}
-          pageSize={15}
-          columns={[
-            { key: "aluno", label: "Aluno", render: (r) => <b style={{ fontWeight: 500 }}>{r.aluno}</b> },
-            { key: "escola", label: "Escola", render: (r) => <SchoolTag school={r.escola} /> },
-            { key: "atendente", label: "Atendente",
-              render: (r) => (r.atendente === "(sem registro de atendimento)"
-                ? <span style={{ color: T.red }}>{r.atendente}</span>
-                : r.atendente) },
-            { key: "credito", label: "Crédito",
-              render: (r) => (Number(r.atendentes_no_lead) > 1
-                ? <span style={{ color: T.amber, fontWeight: 600 }} title={`Dividida entre ${r.atendentes_no_lead} atendentes`}>{dec(r.credito)}</span>
-                : dec(r.credito)),
-              style: { textAlign: "right" } },
-            { key: "valor", label: "Valor", render: (r) => moeda(r.valor), style: { textAlign: "right" } },
-            { key: "curso", label: "Curso", render: (r) => r.curso || <span style={{ color: T.muted }}>—</span> },
-            { key: "data_matricula", label: "Data", render: (r) => dataBR(r.data_matricula), style: { whiteSpace: "nowrap" } },
-            { key: "base_data", label: "Base da data",
-              render: (r) => (
-                <span style={{
-                  fontSize: 10.5, padding: "2px 8px", borderRadius: 20,
-                  background: r.base_data === "DATA PAGAMENTO MATRICULA" ? T.green + T.tint : T.amber + T.tint,
-                  border: `1px solid ${r.base_data === "DATA PAGAMENTO MATRICULA" ? T.green : T.amber}${T.tintForte}`,
-                  color: r.base_data === "DATA PAGAMENTO MATRICULA" ? T.green : T.amber, whiteSpace: "nowrap",
-                }}>{r.base_data}</span>
-              ) },
-            { key: "lead_id", label: "Lead", render: (r) => <span style={{ color: T.muted, fontSize: 11 }}>{r.lead_id}</span> },
-          ]}
-        />
-      </Panel>
+      <RelatorioNominalMatriculas mat={mat} agruparPor="atendente" />
 
       {/* ── Pontos de atenção da base ── */}
       <Panel title={<>Consistência do período <Info texto="Casos que merecem conferência manual no Kommo. Não alteram o total das escolas, mas afetam a atribuição por usuário." /></>}>
@@ -3070,7 +3104,7 @@ export default function DashboardEdilvo() {
                     {aba === "visao" && <AbaVisaoGeral data={data} extra={extra} qual={qual} fila={fila} schools={schools} />}
                     {aba === "pipeline" && <AbaPipeline pipe={pipe} schools={schools} />}
                     {aba === "funil" && <AbaFunilPerdas data={data} schools={schools} />}
-                    {aba === "vendedores" && <AbaVendedores data={data} schools={schools} />}
+                    {aba === "vendedores" && <AbaVendedores data={data} schools={schools} mat={mat} />}
                     {aba === "matriculas" && <AbaMatriculas mat={mat} schools={schools} />}
                     {aba === "origem" && <AbaOrigem data={data} extra={extra} reg={reg} schools={schools} />}
                     {aba === "financeiro" && <AbaFinanceiro data={data} schools={schools} />}

@@ -73,7 +73,14 @@ Os dois fecham entre si. Em julho/2026: Ineprotec 78 (43 Jessica + 26 Marcela + 
 | `dashboard_matriculas(token, from, to, school)` | Total por escola, total por usuário aberto por escola, relatório nominal e diagnóstico |
 | `dashboard_comercial` e demais | Abas anteriores, inalteradas |
 
-A aba **Matrículas & Auditoria** consome `dashboard_matriculas` e exporta o relatório nominal em CSV (separador `;` e BOM, abre direto no Excel pt-BR).
+O relatório nominal aparece em duas telas, pelo mesmo componente:
+
+- **Matrículas & Auditoria** — agrupado pelo nome cru do Registro de Atendimento, que é como se confere no Kommo
+- **Vendedores**, como último bloco da página — agrupado pelo nome normalizado do vendedor, para casar com o ranking exibido acima
+
+Nos dois casos exporta CSV (separador `;` e BOM, abre direto no Excel pt-BR) com o nome do vendedor e o Registro de Atendimento lado a lado.
+
+> A aba Vendedores conta matrículas por `closed_at` + etapa atual (base antiga), enquanto o relatório no rodapé segue o critério canônico. Em julho/2026 a diferença é de 2 matrículas para mais em Jessica, 2 para menos em Giselda e 2 sem registro de atendimento que a base antiga atribuía ao responsável do card. Migrar o ranking e as comissões para o critério canônico é uma decisão em aberto, porque mexe em base de comissionamento.
 
 ---
 
