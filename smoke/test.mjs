@@ -38,6 +38,15 @@ const MAT = {
   diagnostico: { total_matriculas: 124.0, total_leads: 124, por_data_pagamento: 0, por_entrada_status: 105, por_fechamento: 19, sem_atendente: 2, compartilhadas: 1 },
 };
 
+// BASE=canonico simula o periodo inteiro datado por DATA PAGAMENTO MATRICULA
+// (estado de jul/2026 em producao). Sem a variavel, testa a base provisoria.
+const CANONICO = process.env.BASE === "canonico";
+if (CANONICO) {
+  MAT.diagnostico = { total_matriculas: 116.0, total_leads: 116, por_data_pagamento: 116,
+    por_entrada_status: 0, por_fechamento: 0, sem_atendente: 2, compartilhadas: 0 };
+  MAT.lista = MAT.lista.map((r) => ({ ...r, base_data: "DATA PAGAMENTO MATRICULA" }));
+}
+
 const erros = [];
 w.addEventListener("error", (e) => erros.push("window.error: " + e.message));
 w.console.error = (...a) => erros.push("console.error: " + a.join(" "));
@@ -129,7 +138,10 @@ await new Promise((r) => setTimeout(r, 600));
 passos.push(["abriu a aba Matrículas & Auditoria", okAba]);
 
 const t2 = root.textContent || "";
-passos.push(["mostrou o aviso de base provisória", /DATA PAGAMENTO MATRICULA ainda não sincronizado/.test(t2)]);
+passos.push([CANONICO ? "mostrou o selo de critério definitivo" : "mostrou o aviso de base provisória",
+  CANONICO
+    ? (/Contagem por DATA PAGAMENTO MATRICULA/.test(t2) && !/ainda não sincronizado/.test(t2))
+    : (/DATA PAGAMENTO MATRICULA ainda não sincronizado/.test(t2))]);
 passos.push(["listou atendentes", /JESSICA ALVES/.test(t2) && /BRUNA PEREIRA/.test(t2)]);
 passos.push(["trouxe o relatório nominal", /MAIK MATHEUS/.test(t2) && /ARIELA CARRARO/.test(t2)]);
 passos.push(["sinalizou matrícula dividida", /0,5/.test(t2)]);

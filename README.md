@@ -31,15 +31,40 @@ Definido com a operação em julho/2026 e implementado na função `matriculas_p
 
 Uma matrícula pertence ao período filtrado pelo campo **DATA PAGAMENTO MATRICULA**, do cartão do **contato** no Kommo.
 
-Quando esse campo não está disponível, a função cai, nesta ordem, para:
+O campo é o **1375496**, do cartão do contato. Detalhe que muda tudo: ele é do
+tipo **texto**, não data — preenchido à mão, com variações. Por isso o sync grava o
+texto cru em `kommo_contacts.data_pagamento_raw` e a conversão fica concentrada na
+função `parse_data_pagamento`, acionada por trigger. Ajustar o parser reprocessa
+todo o histórico sem rebater na API.
+
+Formatos aceitos: `DD/MM/YYYY`, `DD/MM/YY`, `DDMMYYYY`, `DDMM/YYYY`, `DD-MM-YYYY`,
+`DD.MM.YYYY`, `YYYY-MM-DD`. Valores ambíguos (`15/05` sem ano, `04/05/20226`) ficam
+como `NULL` de propósito — é preferível a matrícula cair no fallback a ser datada
+errado. Para listar o que precisa de correção manual no Kommo:
+
+```sql
+select id, data_pagamento_raw from kommo_contacts
+ where data_pagamento_raw is not null and data_pagamento is null;
+```
+
+Quando o campo não está preenchido, a função cai nesta ordem:
 
 1. `DATA PAGAMENTO MATRICULA` — critério definitivo
 2. Entrada do lead na etapa `MATRICULA REALIZADA` (via `kommo_status_history_full`)
 3. `closed_at` do lead
 
-Cada linha do relatório carrega a coluna **Base da data**, indicando qual das três foi usada. O painel exibe um aviso enquanto a base não for integralmente a definitiva.
+Cada linha do relatório carrega a coluna **Base da data**, indicando qual das três
+foi usada, e o painel só mostra o selo verde quando o período inteiro roda pelo
+critério definitivo. Cobertura após o backfill de jul/2026:
 
-> **Pendência aberta:** a rotina `kommo-sync` (edge function, cron de 30 min) não traz o campo `DATA PAGAMENTO MATRICULA`, que existe no contato do Kommo mas não no banco. As colunas `kommo_contacts.data_pagamento` e `kommo_leads.data_pagamento` já existem e estão indexadas, prontas para receber o valor. Enquanto o sync não preencher, a contagem roda pela base 2.
+| Mês | Matrículas | Por DATA PAGAMENTO | Por etapa | Por fechamento |
+|---|---:|---:|---:|---:|
+| jul/2026 | 116 | 116 | 0 | 0 |
+| jun/2026 | 98 | 97 | 1 | 0 |
+| mai/2026 | 88 | 52 | 28 | 8 |
+
+Maio ainda depende do fallback porque o campo não era preenchido de forma
+consistente naquele período.
 
 ### 2. Quem recebe o crédito
 
@@ -90,6 +115,30 @@ Os testes rodam o bundle em jsdom com os globais UMD reais. O Recharts é substi
 
 ```bash
 cd smoke && npm install jsdom react react-dom prop-types
-node test.mjs        # aba de matrículas
+node test.mjs                   # base provisória
+BASE=canonico node test.mjs    # critério definitivo
 node regressao.mjs ../app.js   # todas as telas
 ```
+
+---
+
+## Sync (edge function `kommo-sync`)
+
+Roda a cada 30 min via `cron.job` chamando a função por `pg_net`. **Não está versionada neste repositório** — vive só no Supabase. Alterações feitas na v14:
+
+```ts
+const CF_DATA_PAGAMENTO = 1375496; // contato: "Data Pagamento Matricula" (texto livre)
+```
+
+e, no mapeamento de contatos, o campo passou a ser gravado cru:
+
+```ts
+const dataPagamentoRaw = cfText(c, CF_DATA_PAGAMENTO);
+return { id: c.id, phone, ddd, estado_uf, email,
+         data_pagamento_raw: dataPagamentoRaw ? String(dataPagamentoRaw) : null,
+         synced_at: new Date().toISOString() };
+```
+
+A função responde com `contactsComDataPagamento` no relatório de execução, para dar visibilidade da cobertura a cada rodada. Ao republicar, manter `verify_jwt: false` — ela faz a própria checagem por token e o cron depende disso.
+
+O sync de contatos processa no máximo 5 páginas por execução (`MAX_CONTACT_PAGES`), então a tabela `kommo_contacts` fica atrás do Kommo. Contatos de matrículas ausentes foram inseridos no backfill.
