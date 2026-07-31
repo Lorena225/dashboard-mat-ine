@@ -14,21 +14,21 @@ const MAT = {
     { escola: "ineprotec", leads: 78, matriculas: 78.0, faturamento: 181166, ticket_medio: 2322.64 },
     { escola: "matricula_ead", leads: 46, matriculas: 46.0, faturamento: 104604, ticket_medio: 2274.0 },
   ],
+  // Usuarios atendem as duas escolas: a quebra vem aninhada em `escolas`.
   por_atendente: [
-    { atendente: "INE - JESSICA ALVES", escola_atendente: "ineprotec", matriculas: 48.0, leads: 48, faturamento: 120670, compartilhadas: 0, ticket_medio: 2513.96 },
-    { atendente: "MAT - BRUNA PEREIRA", escola_atendente: "matricula_ead", matriculas: 29.5, leads: 30, faturamento: 65765, compartilhadas: 1, ticket_medio: 2192.17 },
-    { atendente: "(sem registro de atendimento)", escola_atendente: null, matriculas: 2.0, leads: 2, faturamento: 5113, compartilhadas: 0, ticket_medio: 2556.5 },
-  ],
-  por_atendente_escola: [
-    { atendente: "INE - JESSICA ALVES", escola: "ineprotec", matriculas: 43.0, faturamento: 108000 },
-    { atendente: "MAT - BRUNA PEREIRA", escola: "matricula_ead", matriculas: 29.0, faturamento: 63000 },
+    { atendente: "INE - JESSICA ALVES", matriculas: 48.0, leads: 48, faturamento: 120670, compartilhadas: 0, ticket_medio: 2513.96,
+      escolas: { ineprotec: { matriculas: 43.0, faturamento: 108000 }, matricula_ead: { matriculas: 5.0, faturamento: 12670 } } },
+    { atendente: "MAT - BRUNA PEREIRA", matriculas: 29.5, leads: 30, faturamento: 65765, compartilhadas: 1, ticket_medio: 2192.17,
+      escolas: { matricula_ead: { matriculas: 28.5, faturamento: 63000 }, ineprotec: { matriculas: 1.0, faturamento: 2765 } } },
+    { atendente: "(sem registro de atendimento)", matriculas: 2.0, leads: 2, faturamento: 5113, compartilhadas: 0, ticket_medio: 2556.5,
+      escolas: { ineprotec: { matriculas: 2.0, faturamento: 5113 } } },
   ],
   lista: [
-    { lead_id: 34353712, aluno: "MAIK MATHEUS XAVIER DIAS DE MOURA", escola: "ineprotec", atendente: "INE - MARCELA RABELO", escola_atendente: "ineprotec", atendentes_no_lead: 1, credito: 1.0, valor: 2400, valor_credito: 2400, curso: "Técnico em Enfermagem", data_matricula: "2026-07-31T17:40:55+00:00", base_data: "Entrada em MATRICULA REALIZADA", divergencia_escola: false },
-    { lead_id: 34261482, aluno: "RENATO DE SOUZA MONTEIRO", escola: "matricula_ead", atendente: "MAT - BRUNA PEREIRA", escola_atendente: "matricula_ead", atendentes_no_lead: 2, credito: 0.5, valor: 2200, valor_credito: 1100, curso: null, data_matricula: "2026-07-31T17:29:31+00:00", base_data: "DATA DO PAGAMENTO", divergencia_escola: false },
-    { lead_id: 34174236, aluno: "ARIELA CARRARO", escola: "ineprotec", atendente: "(sem registro de atendimento)", escola_atendente: null, atendentes_no_lead: 1, credito: 1.0, valor: 2513, valor_credito: 2513, curso: "Radiologia", data_matricula: "2026-07-31T11:32:12+00:00", base_data: "Fechamento do lead", divergencia_escola: false },
+    { lead_id: 34353712, aluno: "MAIK MATHEUS XAVIER DIAS DE MOURA", escola: "ineprotec", atendente: "INE - MARCELA RABELO", atendentes_no_lead: 1, credito: 1.0, valor: 2400, valor_credito: 2400, curso: "Tecnico em Enfermagem", data_matricula: "2026-07-31T17:40:55+00:00", base_data: "Entrada em MATRICULA REALIZADA" },
+    { lead_id: 34261482, aluno: "RENATO DE SOUZA MONTEIRO", escola: "matricula_ead", atendente: "MAT - BRUNA PEREIRA", atendentes_no_lead: 2, credito: 0.5, valor: 2200, valor_credito: 1100, curso: null, data_matricula: "2026-07-31T17:29:31+00:00", base_data: "DATA PAGAMENTO MATRICULA" },
+    { lead_id: 34174236, aluno: "ARIELA CARRARO", escola: "ineprotec", atendente: "(sem registro de atendimento)", atendentes_no_lead: 1, credito: 1.0, valor: 2513, valor_credito: 2513, curso: "Radiologia", data_matricula: "2026-07-31T11:32:12+00:00", base_data: "Fechamento do lead" },
   ],
-  diagnostico: { total_matriculas: 124.0, total_leads: 124, por_data_pagamento: 0, por_entrada_status: 105, por_fechamento: 19, sem_atendente: 2, compartilhadas: 1, divergencia_escola: 8 },
+  diagnostico: { total_matriculas: 124.0, total_leads: 124, por_data_pagamento: 0, por_entrada_status: 105, por_fechamento: 19, sem_atendente: 2, compartilhadas: 1 },
 };
 
 const erros = [];
@@ -122,12 +122,27 @@ await new Promise((r) => setTimeout(r, 600));
 passos.push(["abriu a aba Matrículas & Auditoria", okAba]);
 
 const t2 = root.textContent || "";
-passos.push(["mostrou o aviso de base provisória", /DATA DO PAGAMENTO ainda não sincronizado/.test(t2)]);
+passos.push(["mostrou o aviso de base provisória", /DATA PAGAMENTO MATRICULA ainda não sincronizado/.test(t2)]);
 passos.push(["listou atendentes", /JESSICA ALVES/.test(t2) && /BRUNA PEREIRA/.test(t2)]);
 passos.push(["trouxe o relatório nominal", /MAIK MATHEUS/.test(t2) && /ARIELA CARRARO/.test(t2)]);
 passos.push(["sinalizou matrícula dividida", /0,5/.test(t2)]);
 passos.push(["sinalizou lead sem atendimento", /sem registro de atendimento/.test(t2)]);
 passos.push(["ofereceu exportação CSV", /Baixar CSV/.test(t2)]);
+passos.push(["abriu o total do usuário por escola", /Matrículas por usuário/.test(t2)]);
+// Jessica: 5 na Matricula EAD + 43 no Ineprotec = 48. Conferido celula a celula,
+// porque o textContent da linha concatena os numeros ("5"+"43"+"48" -> "54348").
+const linhaDe = (nome) => {
+  const tr = [...w.document.querySelectorAll("table tr")]
+    .find((x) => (x.querySelector("td") || {}).textContent === nome);
+  return tr ? [...tr.querySelectorAll("td")].map((c) => (c.textContent || "").trim()) : null;
+};
+const jes = linhaDe("INE - JESSICA ALVES");
+const bru = linhaDe("MAT - BRUNA PEREIRA");
+passos.push(["abriu a quebra por escola de cada usuário",
+  !!jes && jes[1] === "5" && jes[2] === "43" && jes[3] === "48"]);
+passos.push(["rateou a matrícula dividida no total do usuário",
+  !!bru && bru[1] === "28,5" && bru[2] === "1" && bru[3] === "29,5"]);
+passos.push(["não classificou usuário por prefixo", !/escola do atendente/i.test(t2)]);
 
 let falhou = false;
 for (const [nome, ok] of passos) {

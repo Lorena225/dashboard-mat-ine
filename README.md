@@ -53,12 +53,15 @@ Por isso o total por atendente pode ser fracionado.
 
 ### 3. Separação por escola
 
-A função devolve duas dimensões, porque elas divergem em parte dos casos:
+Os usuários atendem as duas escolas. O prefixo `INE - ` / `MAT - ` faz parte do nome
+cadastrado no Kommo e **não** classifica a matrícula.
 
-- `escola` — a escola do lead, definida pelo funil. **É a que o painel usa para totalizar.**
-- `escola_atendente` — derivada do prefixo do Registro de Atendimento (`INE - ` / `MAT - `)
+- **Total por escola** — sempre pela escola do lead (funil).
+- **Total por usuário** — aberto por escola: quantas matrículas ele fez em cada uma.
 
-Quando as duas diferem, a linha é marcada com `divergencia_escola` e contabilizada no bloco "Consistência do período". Em julho/2026 eram 8 casos em 124 matrículas.
+Os dois fecham entre si. Em julho/2026: Ineprotec 78 (43 Jessica + 26 Marcela + 6 Giselda
++ 1 Bruna + 2 sem registro) e Matrícula EAD 46 (29 Bruna + 10 Pedro + 5 Jessica
++ 1 Marcela + 1 Giselda).
 
 ---
 
@@ -67,7 +70,7 @@ Quando as duas diferem, a linha é marcada com `divergencia_escola` e contabiliz
 | RPC | Função |
 |---|---|
 | `matriculas_periodo(from, to)` | Base canônica: uma linha por matrícula × atendente, com crédito rateado |
-| `dashboard_matriculas(token, from, to, school)` | Resumo por escola, por atendente, por atendente × escola, relatório nominal e diagnóstico |
+| `dashboard_matriculas(token, from, to, school)` | Total por escola, total por usuário aberto por escola, relatório nominal e diagnóstico |
 | `dashboard_comercial` e demais | Abas anteriores, inalteradas |
 
 A aba **Matrículas & Auditoria** consome `dashboard_matriculas` e exporta o relatório nominal em CSV (separador `;` e BOM, abre direto no Excel pt-BR).

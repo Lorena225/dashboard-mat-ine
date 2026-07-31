@@ -2629,11 +2629,12 @@ function periodoRange(id) {
 
 // ── Aba: Matrículas & Auditoria ──
 // Critério canônico de matrícula (definido com a operação em jul/2026):
-//   1. Data: campo DATA DO PAGAMENTO dentro do período filtrado.
+//   1. Data: campo DATA PAGAMENTO MATRICULA (cartão do contato) dentro do período.
 //   2. Atribuição: exclusivamente pelo campo REGISTRO DE ATENDIMENTO.
 //      Com mais de um atendente registrado, a matrícula é dividida em partes iguais.
-// A RPC dashboard_matriculas informa, por linha, qual base de data foi usada —
-// o painel de critério abaixo torna isso explícito em vez de silenciar a lacuna.
+//   3. Escola: sempre a do lead (funil). Os atendentes atuam nas duas escolas, então
+//      o prefixo INE-/MAT- no nome do usuário é só parte do nome e não classifica nada —
+//      por isso o total de cada usuário vem aberto por escola.
 function AbaMatriculas({ mat, schools }) {
   const [filtroAtendente, setFiltroAtendente] = useState("todos");
 
@@ -2642,8 +2643,6 @@ function AbaMatriculas({ mat, schools }) {
   const diag = mat.diagnostico || {};
   const lista = mat.lista || [];
   const porEscola = mat.por_escola || [];
-  const porAtendente = mat.por_atendente || [];
-  const porAtEscola = mat.por_atendente_escola || [];
 
   const totalLeads = Number(diag.total_leads || 0);
   const canonico = totalLeads > 0 && Number(diag.por_data_pagamento || 0) === totalLeads;
@@ -2652,17 +2651,26 @@ function AbaMatriculas({ mat, schools }) {
   const dec = (v) => Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
   const dataBR = (s) => (s ? new Date(s).toLocaleDateString("pt-BR") : "—");
 
+  // A quebra por escola vem aninhada em `escolas`; achatamos para a tabela poder ordenar.
+  const porAtendente = (mat.por_atendente || []).map((r) => {
+    const linha = { ...r };
+    schools.forEach((s) => {
+      const e = (r.escolas || {})[s] || {};
+      linha[`m_${s}`] = Number(e.matriculas || 0);
+      linha[`f_${s}`] = Number(e.faturamento || 0);
+    });
+    return linha;
+  });
+
   const listaFiltrada = filtroAtendente === "todos" ? lista : lista.filter((r) => r.atendente === filtroAtendente);
 
   const baixarCSV = () => {
-    const cab = ["Lead ID", "Aluno", "Escola do lead", "Atendente", "Escola do atendente",
-      "Atendentes no lead", "Crédito", "Valor do lead", "Valor rateado", "Curso",
-      "Data da matrícula", "Base da data", "Divergência de escola"];
+    const cab = ["Lead ID", "Aluno", "Escola", "Atendente", "Atendentes no lead",
+      "Crédito", "Valor do lead", "Valor rateado", "Curso", "Data da matrícula", "Base da data"];
     const linhas = listaFiltrada.map((r) => [
       r.lead_id, r.aluno, (SCHOOLS[r.escola] || {}).label || r.escola, r.atendente,
-      (SCHOOLS[r.escola_atendente] || {}).label || "", r.atendentes_no_lead,
-      dec(r.credito), dec(r.valor), dec(r.valor_credito), r.curso || "",
-      dataBR(r.data_matricula), r.base_data, r.divergencia_escola ? "Sim" : "Não",
+      r.atendentes_no_lead, dec(r.credito), dec(r.valor), dec(r.valor_credito),
+      r.curso || "", dataBR(r.data_matricula), r.base_data,
     ]);
     const csv = [cab, ...linhas]
       .map((l) => l.map((c) => `"${String(c == null ? "" : c).replace(/"/g, '""')}"`).join(";"))
@@ -2682,6 +2690,27 @@ function AbaMatriculas({ mat, schools }) {
     fontSize: 11.5, fontWeight: 500, cursor: "pointer", fontFamily: font, whiteSpace: "nowrap",
   });
 
+  // Atendente | (uma coluna por escola) | Total | Faturamento | Compartilhadas
+  const colunasAtendente = [
+    { key: "atendente", label: "Atendente" },
+    ...schools.map((s) => ({
+      key: `m_${s}`,
+      label: (SCHOOLS[s] || {}).label || s,
+      style: { textAlign: "right" },
+      render: (r) => (r[`m_${s}`] > 0
+        ? <span style={{ color: SCHOOLS[s].color, fontWeight: 600 }} title={moeda(r[`f_${s}`])}>{dec(r[`m_${s}`])}</span>
+        : <span style={{ color: T.muted }}>—</span>),
+    })),
+    { key: "matriculas", label: "Total", style: { textAlign: "right" }, render: (r) => <b>{dec(r.matriculas)}</b> },
+    { key: "faturamento", label: "Faturamento", style: { textAlign: "right" }, render: (r) => moeda(r.faturamento) },
+    {
+      key: "compartilhadas", label: "Divididas", style: { textAlign: "right" },
+      render: (r) => (Number(r.compartilhadas) > 0
+        ? <span style={{ color: T.amber, fontWeight: 600 }}>{num(r.compartilhadas)}</span>
+        : <span style={{ color: T.muted }}>0</span>),
+    },
+  ];
+
   return (
     <div style={{ display: "grid", gap: 14 }}>
 
@@ -2694,28 +2723,28 @@ function AbaMatriculas({ mat, schools }) {
       }}>
         <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 5 }}>
           {canonico
-            ? "Contagem por DATA DO PAGAMENTO"
-            : "Base de data provisória — campo DATA DO PAGAMENTO ainda não sincronizado"}
+            ? "Contagem por DATA PAGAMENTO MATRICULA"
+            : "Base de data provisória — campo DATA PAGAMENTO MATRICULA ainda não sincronizado"}
         </div>
         <div style={{ fontSize: 11.5, lineHeight: 1.65, color: T.text, opacity: 0.9 }}>
           {canonico ? (
-            <>Todas as {num(totalLeads)} matrículas do período foram datadas pelo campo <b>DATA DO PAGAMENTO</b> do contato,
-            conforme o critério definido pela operação.</>
+            <>Todas as {num(totalLeads)} matrículas do período foram datadas pelo campo <b>DATA PAGAMENTO MATRICULA</b> do
+            contato, conforme o critério definido pela operação.</>
           ) : (
-            <>O campo <b>DATA DO PAGAMENTO</b> não é trazido pela rotina <code>kommo-sync</code>, então ele ainda não existe
+            <>O campo <b>DATA PAGAMENTO MATRICULA</b> não é trazido pela rotina <code>kommo-sync</code>, então ainda não existe
             no banco. Enquanto isso, cada matrícula é datada pela melhor referência disponível, e a coluna
-            <b> Base da data</b> no relatório mostra qual foi usada em cada linha. Assim que o sync passar a trazer o campo,
+            <b> Base da data</b> no relatório mostra qual foi usada em cada linha. Assim que o campo for sincronizado,
             a contagem migra sozinha para o critério definitivo, sem nova alteração no painel.</>
           )}
         </div>
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 9, fontSize: 11, color: T.muted }}>
-          <span>DATA DO PAGAMENTO: <b style={{ color: T.text }}>{num(diag.por_data_pagamento)}</b></span>
+          <span>DATA PAGAMENTO MATRICULA: <b style={{ color: T.text }}>{num(diag.por_data_pagamento)}</b></span>
           <span>Entrada em MATRICULA REALIZADA: <b style={{ color: T.text }}>{num(diag.por_entrada_status)}</b></span>
           <span>Fechamento do lead: <b style={{ color: T.text }}>{num(diag.por_fechamento)}</b></span>
         </div>
       </div>
 
-      {/* ── KPIs por escola, lado a lado ── */}
+      {/* ── Total por escola ── */}
       <div style={{ display: "grid", gridTemplateColumns: `repeat(${schools.length}, minmax(0,1fr))`, gap: 14 }}>
         {schools.map((s) => {
           const e = porEscola.find((x) => x.escola === s) || {};
@@ -2723,7 +2752,7 @@ function AbaMatriculas({ mat, schools }) {
             <Panel key={s} title={<SchoolTag school={s} />}>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(115px,1fr))", gap: 10 }}>
                 <Kpi label="Matrículas" value={dec(e.matriculas)} accent={SCHOOLS[s].color}
-                  title="Soma dos créditos de matrícula. Matrícula com mais de um atendente no Registro de Atendimento entra fracionada." />
+                  title="Total da escola no período, pelo funil do lead. Matrícula com mais de um atendente no Registro de Atendimento entra fracionada no total por usuário, mas inteira no total da escola." />
                 <Kpi label="Faturamento" value={moeda(e.faturamento)} />
                 <Kpi label="Ticket médio" value={moeda(e.ticket_medio)} />
               </div>
@@ -2732,54 +2761,23 @@ function AbaMatriculas({ mat, schools }) {
         })}
       </div>
 
-      {/* ── Matrículas por atendente ── */}
-      <Panel title={<>Matrículas por atendente <Info texto="A atribuição usa exclusivamente o campo REGISTRO DE ATENDIMENTO do lead — não o responsável do card. Quando há mais de um atendente registrado, a matrícula é dividida igualmente entre eles, por isso os valores podem ser fracionados." /></>}>
+      {/* ── Matrículas por usuário, abertas por escola ── */}
+      <Panel title={<>Matrículas por usuário <Info texto="A atribuição usa exclusivamente o campo REGISTRO DE ATENDIMENTO do lead — não o responsável do card. Como os usuários atendem as duas escolas, cada linha mostra quantas matrículas ele fez em cada uma. Quando há mais de um atendente no mesmo lead, a matrícula é dividida igualmente entre eles, por isso os valores podem ser fracionados." /></>}>
         <DataTable
           rows={porAtendente}
           initialSort={{ key: "matriculas", dir: "desc" }}
           pageSize={12}
-          columns={[
-            { key: "atendente", label: "Atendente" },
-            {
-              key: "escola_atendente", label: "Escola",
-              render: (r) => (r.escola_atendente ? <SchoolTag school={r.escola_atendente} /> : <span style={{ color: T.muted }}>—</span>),
-            },
-            { key: "matriculas", label: "Matrículas", render: (r) => <b>{dec(r.matriculas)}</b>, style: { textAlign: "right" } },
-            { key: "leads", label: "Leads", render: (r) => num(r.leads), style: { textAlign: "right" } },
-            {
-              key: "compartilhadas", label: "Compartilhadas",
-              render: (r) => (Number(r.compartilhadas) > 0
-                ? <span style={{ color: T.amber, fontWeight: 600 }}>{num(r.compartilhadas)}</span>
-                : <span style={{ color: T.muted }}>0</span>),
-              style: { textAlign: "right" },
-            },
-            { key: "faturamento", label: "Faturamento", render: (r) => moeda(r.faturamento), style: { textAlign: "right" } },
-            { key: "ticket_medio", label: "Ticket médio", render: (r) => moeda(r.ticket_medio), style: { textAlign: "right" } },
-          ]}
+          columns={colunasAtendente}
         />
+        <div style={{ marginTop: 10, fontSize: 11, color: T.muted, lineHeight: 1.6 }}>
+          A escola de cada matrícula é a do funil do lead. O prefixo no nome do usuário não classifica a matrícula.
+          Passe o cursor sobre o número de cada escola para ver o faturamento correspondente.
+        </div>
       </Panel>
-
-      {/* ── Recorte por escola ── */}
-      <div style={{ display: "grid", gridTemplateColumns: `repeat(${schools.length}, minmax(0,1fr))`, gap: 14 }}>
-        {schools.map((s) => (
-          <Panel key={s} title={<>Atendentes · {(SCHOOLS[s] || {}).label}</>}>
-            <DataTable
-              rows={porAtEscola.filter((r) => r.escola === s)}
-              initialSort={{ key: "matriculas", dir: "desc" }}
-              pageSize={8}
-              columns={[
-                { key: "atendente", label: "Atendente" },
-                { key: "matriculas", label: "Matrículas", render: (r) => <b>{dec(r.matriculas)}</b>, style: { textAlign: "right" } },
-                { key: "faturamento", label: "Faturamento", render: (r) => moeda(r.faturamento), style: { textAlign: "right" } },
-              ]}
-            />
-          </Panel>
-        ))}
-      </div>
 
       {/* ── Relatório nominal para auditoria ── */}
       <Panel
-        title={<>Relatório nominal · auditoria <Info texto="Lista completa das matrículas contadas no período, nome a nome, com o atendente que recebeu o crédito e a base de data usada. É este relatório que permite conferir o painel linha a linha contra o Kommo." /></>}
+        title={<>Relatório nominal · auditoria <Info texto="Lista completa das matrículas contadas no período, nome a nome, com o usuário que recebeu o crédito e a base de data usada. É este relatório que permite conferir o painel linha a linha contra o Kommo." /></>}
         right={
           <button onClick={baixarCSV} style={{
             background: T.ink, color: T.onInk, border: "none", borderRadius: 8,
@@ -2821,9 +2819,9 @@ function AbaMatriculas({ mat, schools }) {
               render: (r) => (
                 <span style={{
                   fontSize: 10.5, padding: "2px 8px", borderRadius: 20,
-                  background: r.base_data === "DATA DO PAGAMENTO" ? T.green + T.tint : T.amber + T.tint,
-                  border: `1px solid ${r.base_data === "DATA DO PAGAMENTO" ? T.green : T.amber}${T.tintForte}`,
-                  color: r.base_data === "DATA DO PAGAMENTO" ? T.green : T.amber, whiteSpace: "nowrap",
+                  background: r.base_data === "DATA PAGAMENTO MATRICULA" ? T.green + T.tint : T.amber + T.tint,
+                  border: `1px solid ${r.base_data === "DATA PAGAMENTO MATRICULA" ? T.green : T.amber}${T.tintForte}`,
+                  color: r.base_data === "DATA PAGAMENTO MATRICULA" ? T.green : T.amber, whiteSpace: "nowrap",
                 }}>{r.base_data}</span>
               ) },
             { key: "lead_id", label: "Lead", render: (r) => <span style={{ color: T.muted, fontSize: 11 }}>{r.lead_id}</span> },
@@ -2832,24 +2830,21 @@ function AbaMatriculas({ mat, schools }) {
       </Panel>
 
       {/* ── Pontos de atenção da base ── */}
-      <Panel title={<>Consistência do período <Info texto="Casos que merecem conferência manual no Kommo. Não alteram a contagem, mas indicam preenchimento incompleto ou cruzado entre as escolas." /></>}>
+      <Panel title={<>Consistência do período <Info texto="Casos que merecem conferência manual no Kommo. Não alteram o total das escolas, mas afetam a atribuição por usuário." /></>}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 12 }}>
           <Kpi label="Matrículas no período" value={dec(diag.total_matriculas)}
-            title="Soma dos créditos. Pode diferir da contagem de leads quando há matrícula dividida." />
+            title="Soma de todas as escolas no período." />
           <Kpi label="Sem Registro de Atendimento" value={num(diag.sem_atendente)}
             accent={Number(diag.sem_atendente) > 0 ? T.red : undefined}
-            title="Matrículas sem nenhum atendente no campo. Ficam sem dono e precisam ser preenchidas no Kommo." />
-          <Kpi label="Divididas entre atendentes" value={num(diag.compartilhadas)}
+            title="Matrículas sem nenhum atendente no campo. Entram no total da escola, mas ficam sem dono." />
+          <Kpi label="Divididas entre usuários" value={num(diag.compartilhadas)}
             accent={Number(diag.compartilhadas) > 0 ? T.amber : undefined}
             title="Leads com mais de um nome no Registro de Atendimento. O crédito foi rateado em partes iguais." />
-          <Kpi label="Escola divergente" value={num(diag.divergencia_escola)}
-            accent={Number(diag.divergencia_escola) > 0 ? T.amber : undefined}
-            title="A escola do lead difere do prefixo do atendente (ex.: lead da Matrícula EAD atendido por INE). O painel conta pela escola do lead." />
         </div>
         {Number(diag.sem_atendente) > 0 && (
           <div style={{ marginTop: 12, fontSize: 11.5, color: T.muted, lineHeight: 1.6 }}>
             {num(diag.sem_atendente)} matrícula(s) do período estão sem Registro de Atendimento e aparecem no relatório
-            como <b>(sem registro de atendimento)</b>. Elas entram no total da escola, mas não são creditadas a nenhum atendente.
+            como <b>(sem registro de atendimento)</b>. Elas contam para a escola, mas não são creditadas a nenhum usuário.
           </div>
         )}
       </Panel>
