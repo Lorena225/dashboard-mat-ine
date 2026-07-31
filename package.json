@@ -1,0 +1,13 @@
+{
+  "name": "dashboard-mat-ine",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Painel Edilvo — Matrícula EAD & Ineprotec (VirtruvIA)",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.23.1"
+  }
+}
