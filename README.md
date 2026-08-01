@@ -142,3 +142,13 @@ return { id: c.id, phone, ddd, estado_uf, email,
 A função responde com `contactsComDataPagamento` no relatório de execução, para dar visibilidade da cobertura a cada rodada. Ao republicar, manter `verify_jwt: false` — ela faz a própria checagem por token e o cron depende disso.
 
 O sync de contatos processa no máximo 5 páginas por execução (`MAX_CONTACT_PAGES`), então a tabela `kommo_contacts` fica atrás do Kommo. Contatos de matrículas ausentes foram inseridos no backfill.
+
+---
+
+## Deploy (Vercel)
+
+O projeto era um site estático sem `package.json`; a Vercel servia a raiz direto. Ao introduzir o build com esbuild, ela passou a rodar `npm run build` e a exigir uma pasta de saída — sem isso o deploy falha com *No Output Directory named "public"*.
+
+Por isso existe o `vercel.json` apontando `outputDirectory` para `dist/`, que o build monta com `index.html` + `app.js`. O `dist/` é gerado e não vai para o repositório.
+
+Ao mexer no build, confira em Vercel → Deployments se o estado ficou **Ready**: um push aceito pelo Git não garante deploy bem-sucedido.

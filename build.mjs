@@ -1,5 +1,6 @@
 // Build: source-app.jsx -> app.js (React/Recharts como globais UMD, sem bundler no runtime)
 import * as esbuild from "esbuild";
+import { mkdirSync, copyFileSync } from "node:fs";
 
 const GLOBALS = { react: "React", "react-dom": "ReactDOM", recharts: "Recharts" };
 
@@ -36,3 +37,9 @@ await esbuild.build({
   plugins: [externalGlobals],
   logLevel: "info",
 });
+
+// A Vercel roda este build e publica o conteudo de dist/ (ver vercel.json).
+// app.js continua na raiz para os testes e para inspecao no repositorio.
+mkdirSync("dist", { recursive: true });
+for (const f of ["index.html", "app.js"]) copyFileSync(f, `dist/${f}`);
+console.log("dist/ pronto: index.html + app.js");
