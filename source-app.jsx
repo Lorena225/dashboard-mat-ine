@@ -1678,14 +1678,31 @@ function FreshChip({ fresh }) {
     { lab: "Google", d: diasDe(fresh.google), lim: 2 },
     { lab: "Meta", d: diasDe(fresh.meta), lim: 2 },
   ];
+  // Antes o atraso ficava so no tooltip de um ponto de 7px, e integracao parada
+  // passava despercebida ate alguem estranhar os numeros. Agora, quando a fonte
+  // passa do limite, o atraso aparece escrito ao lado do nome.
   return (
     <span style={{ display: "inline-flex", gap: 8, alignItems: "center", marginRight: 6, fontSize: 11, color: T.muted }}>
-      {itens.map((i) => (
-        <span key={i.lab} title={`Última atualização: ${i.d == null ? "—" : i.d === 0 ? "hoje" : i.d + " dia(s) atrás"}`} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-          <span style={{ width: 7, height: 7, borderRadius: 4, background: i.d == null ? T.muted : i.d <= i.lim ? T.green : i.d <= i.lim + 3 ? T.amber : T.red }} />
-          {i.lab}
-        </span>
-      ))}
+      {itens.map((i) => {
+        const cor = i.d == null ? T.muted : i.d <= i.lim ? T.green : i.d <= i.lim + 3 ? T.amber : T.red;
+        const atrasado = i.d != null && i.d > i.lim;
+        return (
+          <span
+            key={i.lab}
+            title={`${i.lab} — última atualização: ${i.d == null ? "sem dados" : i.d === 0 ? "hoje" : i.d + " dia(s) atrás"}${atrasado ? ". A integração pode estar parada; os números deste período ficam incompletos." : ""}`}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 4,
+              ...(atrasado ? {
+                color: cor, fontWeight: 600, background: cor + T.tint,
+                border: `1px solid ${cor}${T.tintForte}`, borderRadius: 20, padding: "1px 7px",
+              } : null),
+            }}
+          >
+            <span style={{ width: 7, height: 7, borderRadius: 4, background: cor }} />
+            {i.lab}{atrasado ? ` ${i.d}d` : ""}
+          </span>
+        );
+      })}
     </span>
   );
 }
