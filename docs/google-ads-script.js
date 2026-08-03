@@ -70,8 +70,11 @@ function coletar(de, ate) {
     'WHERE segments.date BETWEEN "' + de + '" AND "' + ate + '" ' +
     '  AND metrics.impressions > 0';
 
+  // Sem apiVersion de proposito: fixar uma versao ('v18', etc.) faz o Google
+  // recusar com "Specified version not supported" quando a conta esta em outra.
+  // Sem o parametro, ele usa a versao padrao vigente.
   var linhas = [];
-  var it = AdsApp.search(query, { apiVersion: 'v18' });
+  var it = AdsApp.search(query);
 
   while (it.hasNext()) {
     var row = it.next();
