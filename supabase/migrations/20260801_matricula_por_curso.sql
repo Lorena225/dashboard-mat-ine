@@ -32,3 +32,11 @@ $$;
 
 -- Corpo completo de matriculas_periodo e dashboard_matriculas aplicado no banco.
 -- Ver as migrations criterio_matricula_v3 e dashboard_matriculas_v3_por_curso.
+
+-- ── Correção posterior: escola pelo FUNIL, não pelo campo "Empresa" ──
+-- O sync prioriza o custom field Empresa (1373401) sobre o funil. Em 21 leads
+-- de ~38 mil os dois se contradizem, por erro de preenchimento no Kommo.
+-- matriculas_periodo passa a derivar a escola do pipeline:
+--     case when ps.pipeline_name like 'MAT%' then 'matricula_ead' else 'ineprotec' end
+-- Caso que expôs isso: PEDRO HENRIQUE REIS DOS SANTOS, no MAT - FUNIL DE VENDAS,
+-- atendido por "MAT - BRUNA PEREIRA", mas com Empresa marcada como Ineprotec.
