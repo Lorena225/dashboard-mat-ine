@@ -122,6 +122,23 @@ node regressao.mjs ../app.js   # todas as telas
 
 ---
 
+## Google Ads (edge function `google-ingest` + Google Ads Script)
+
+A conta não tem developer token da Google Ads API nem assinatura ativa do
+Supermetrics (o teste gratuito expirou em 29/07/2026). A integração usa
+**Google Ads Scripts**: um script roda dentro da própria conta de anúncios,
+com as permissões do usuário que autorizou, e envia as métricas por POST
+para a edge function `google-ingest`. Sem OAuth, sem developer token, sem custo.
+
+- Script para colar no Google Ads: [`docs/google-ads-script.js`](docs/google-ads-script.js)
+- Instalar nas **duas** contas: INEPROTEC (`992-634-0346`) e Matrícula EaD (`250-021-2013`)
+- Agendamento sugerido: diário, ~06:00
+- A escola é definida pelo ID da conta, dentro da edge function. Conta não
+  mapeada é **recusada** em vez de gravada com escola errada.
+- Cada execução reenvia os últimos 7 dias, para capturar conversões que o
+  Google credita retroativamente. O upsert é idempotente.
+- Acompanhe em `sync_state`, chaves `google_ads_<id_da_conta>`.
+
 ## Sync (edge function `kommo-sync`)
 
 Roda a cada 30 min via `cron.job` chamando a função por `pg_net`. **Não está versionada neste repositório** — vive só no Supabase. Alterações feitas na v14:
