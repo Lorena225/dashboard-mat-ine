@@ -2673,14 +2673,15 @@ function RelatorioNominalMatriculas({ mat, agruparPor = "atendente" }) {
   const filtrada = filtro === "todos" ? lista : lista.filter((r) => r[campo] === filtro);
 
   const baixarCSV = () => {
-    const cab = ["Lead ID", "Aluno", "Escola", "Vendedor", "Registro de Atendimento",
-      "Atendentes no lead", "Crédito", "Valor do lead", "Valor rateado", "Curso",
-      "Data da matrícula", "Base da data"];
+    const cab = ["Lead ID", "Aluno", "Escola", "Curso", "Cursos no lead", "Vendedor",
+      "Registro de Atendimento", "Atendentes no lead", "Crédito",
+      "Valor do lead", "Valor rateado", "Data do pagamento"];
     const linhas = filtrada.map((r) => [
       r.lead_id, r.aluno, (SCHOOLS[r.escola] || {}).label || r.escola,
+      r.curso || "(sem curso)", r.cursos_no_lead,
       r.vendedor, r.atendente, r.atendentes_no_lead,
       dec(r.credito), dec(r.valor), dec(r.valor_credito),
-      r.curso || "", dataBR(r.data_matricula), r.base_data,
+      dataBR(r.data_matricula),
     ]);
     const csv = [cab, ...linhas]
       .map((l) => l.map((c) => `"${String(c == null ? "" : c).replace(/"/g, '""')}"`).join(";"))
@@ -2743,19 +2744,25 @@ function RelatorioNominalMatriculas({ mat, agruparPor = "atendente" }) {
               : dec(r.credito)),
           },
           { key: "valor", label: "Valor", render: (r) => moeda(r.valor), style: { textAlign: "right" } },
-          { key: "curso", label: "Curso", render: (r) => r.curso || <span style={{ color: T.muted }}>—</span> },
-          { key: "data_matricula", label: "Data", render: (r) => dataBR(r.data_matricula), style: { whiteSpace: "nowrap" } },
           {
-            key: "base_data", label: "Base da data",
+            key: "curso", label: "Curso",
             render: (r) => (
-              <span style={{
-                fontSize: 10.5, padding: "2px 8px", borderRadius: 20,
-                background: r.base_data === "DATA PAGAMENTO MATRICULA" ? T.green + T.tint : T.amber + T.tint,
-                border: `1px solid ${r.base_data === "DATA PAGAMENTO MATRICULA" ? T.green : T.amber}${T.tintForte}`,
-                color: r.base_data === "DATA PAGAMENTO MATRICULA" ? T.green : T.amber, whiteSpace: "nowrap",
-              }}>{r.base_data}</span>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                {r.curso || <span style={{ color: T.muted }}>(sem curso)</span>}
+                {Number(r.cursos_no_lead) > 1 && (
+                  <span
+                    title={`Este aluno fez ${r.cursos_no_lead} matrículas: uma para cada curso do lead.`}
+                    style={{
+                      fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 20,
+                      background: T.ink + T.tint, border: `1px solid ${T.ink}${T.tintForte}`,
+                      color: T.ink, whiteSpace: "nowrap",
+                    }}
+                  >{r.cursos_no_lead} cursos</span>
+                )}
+              </span>
             ),
           },
+          { key: "data_matricula", label: "Pagamento", render: (r) => dataBR(r.data_matricula), style: { whiteSpace: "nowrap" } },
           { key: "lead_id", label: "Lead", render: (r) => <span style={{ color: T.muted, fontSize: 11 }}>{r.lead_id}</span> },
         ]}
       />
@@ -2819,31 +2826,24 @@ function AbaMatriculas({ mat, schools }) {
 
       {/* ── Critério de contagem em vigor ── */}
       <div style={{
-        background: canonico ? T.green + T.tint : T.amber + T.tint,
-        border: `1px solid ${canonico ? T.green : T.amber}${T.tintForte}`,
-        borderLeft: `3px solid ${canonico ? T.green : T.amber}`,
+        background: T.green + T.tint,
+        border: `1px solid ${T.green}${T.tintForte}`,
+        borderLeft: `3px solid ${T.green}`,
         borderRadius: 10, padding: "13px 16px",
       }}>
         <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 5 }}>
-          {canonico
-            ? "Contagem por DATA PAGAMENTO MATRICULA"
-            : "Base de data provisória — campo DATA PAGAMENTO MATRICULA ainda não sincronizado"}
+          Critério conferido contra a planilha de julho/2026
         </div>
         <div style={{ fontSize: 11.5, lineHeight: 1.65, color: T.text, opacity: 0.9 }}>
-          {canonico ? (
-            <>Todas as {num(totalLeads)} matrículas do período foram datadas pelo campo <b>DATA PAGAMENTO MATRICULA</b> do
-            contato, conforme o critério definido pela operação.</>
-          ) : (
-            <>O campo <b>DATA PAGAMENTO MATRICULA</b> não é trazido pela rotina <code>kommo-sync</code>, então ainda não existe
-            no banco. Enquanto isso, cada matrícula é datada pela melhor referência disponível, e a coluna
-            <b> Base da data</b> no relatório mostra qual foi usada em cada linha. Assim que o campo for sincronizado,
-            a contagem migra sozinha para o critério definitivo, sem nova alteração no painel.</>
-          )}
+          Conta como matrícula o lead na etapa <b>MATRÍCULA REALIZADA</b> com <b>DATA PAGAMENTO MATRICULA</b>
+          dentro do período. A unidade contada é o <b>curso</b>, não o lead: aluno com mais de um curso listado
+          fez mais de uma matrícula. O crédito vai para quem está no <b>REGISTRO DE ATENDIMENTO</b>,
+          rateado quando há mais de um nome. Leads repetidos (mesmo aluno, curso e data) contam uma vez.
         </div>
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 9, fontSize: 11, color: T.muted }}>
-          <span>DATA PAGAMENTO MATRICULA: <b style={{ color: T.text }}>{num(diag.por_data_pagamento)}</b></span>
-          <span>Entrada em MATRICULA REALIZADA: <b style={{ color: T.text }}>{num(diag.por_entrada_status)}</b></span>
-          <span>Fechamento do lead: <b style={{ color: T.text }}>{num(diag.por_fechamento)}</b></span>
+          <span>Matrículas: <b style={{ color: T.text }}>{dec(diag.total_matriculas)}</b></span>
+          <span>Leads: <b style={{ color: T.text }}>{num(diag.total_leads)}</b></span>
+          <span>Alunos com mais de um curso: <b style={{ color: T.text }}>{num(diag.alunos_multi_curso)}</b></span>
         </div>
       </div>
 
@@ -2881,21 +2881,42 @@ function AbaMatriculas({ mat, schools }) {
       <RelatorioNominalMatriculas mat={mat} agruparPor="atendente" />
 
       {/* ── Pontos de atenção da base ── */}
-      <Panel title={<>Consistência do período <Info texto="Casos que merecem conferência manual no Kommo. Não alteram o total das escolas, mas afetam a atribuição por usuário." /></>}>
+      <Panel title={<>Consistência do período <Info texto="Casos que merecem conferência manual no Kommo. Os dois primeiros já estão contados; os dois últimos ficam de fora da contagem até serem corrigidos na origem." /></>}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 12 }}>
           <Kpi label="Matrículas no período" value={dec(diag.total_matriculas)}
-            title="Soma de todas as escolas no período." />
+            title="Soma de todas as escolas, contando uma matrícula por curso." />
+          <Kpi label="Alunos com mais de um curso" value={num(diag.alunos_multi_curso)}
+            title="Cada curso listado no lead vira uma matrícula. Estes alunos entram no relatório em mais de uma linha." />
           <Kpi label="Sem Registro de Atendimento" value={num(diag.sem_atendente)}
             accent={Number(diag.sem_atendente) > 0 ? T.red : undefined}
-            title="Matrículas sem nenhum atendente no campo. Entram no total da escola, mas ficam sem dono." />
-          <Kpi label="Divididas entre usuários" value={num(diag.compartilhadas)}
-            accent={Number(diag.compartilhadas) > 0 ? T.amber : undefined}
-            title="Leads com mais de um nome no Registro de Atendimento. O crédito foi rateado em partes iguais." />
+            title="Contam para a escola, mas não são creditadas a nenhum vendedor. Preencher o campo no Kommo." />
+          <Kpi label="Na etapa sem data de pagamento" value={num(diag.sem_data_pagamento)}
+            accent={Number(diag.sem_data_pagamento) > 0 ? T.red : undefined}
+            title="Leads em MATRÍCULA REALIZADA cujo campo DATA PAGAMENTO MATRICULA está vazio. Ficam FORA da contagem até serem preenchidos no Kommo." />
         </div>
+
+        {Number(diag.sem_data_pagamento) > 0 && (
+          <div style={{
+            marginTop: 12, padding: "10px 13px", borderRadius: 8,
+            background: T.red + T.tint, border: `1px solid ${T.red}${T.tintForte}`,
+            fontSize: 11.5, lineHeight: 1.6,
+          }}>
+            <b>{num(diag.sem_data_pagamento)} matrícula(s) não estão sendo contadas</b> porque o campo
+            DATA PAGAMENTO MATRICULA está vazio no cartão do contato. Preencher no Kommo faz elas
+            entrarem automaticamente na próxima sincronização.
+            {(mat.pendencias || []).length > 0 && (
+              <div style={{ marginTop: 7, color: T.muted }}>
+                {(mat.pendencias || []).slice(0, 8).map((p) => p.name).join(" · ")}
+                {(mat.pendencias || []).length > 8 ? ` … e mais ${(mat.pendencias || []).length - 8}` : ""}
+              </div>
+            )}
+          </div>
+        )}
+
         {Number(diag.sem_atendente) > 0 && (
           <div style={{ marginTop: 12, fontSize: 11.5, color: T.muted, lineHeight: 1.6 }}>
-            {num(diag.sem_atendente)} matrícula(s) do período estão sem Registro de Atendimento e aparecem no relatório
-            como <b>(sem registro de atendimento)</b>. Elas contam para a escola, mas não são creditadas a nenhum usuário.
+            {num(diag.sem_atendente)} matrícula(s) estão sem Registro de Atendimento e aparecem no relatório
+            como <b>(sem registro de atendimento)</b>. Contam para a escola, mas não para nenhum vendedor.
           </div>
         )}
       </Panel>

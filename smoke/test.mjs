@@ -31,11 +31,15 @@ const MAT = {
       escolas: { ineprotec: { matriculas: 2.0, faturamento: 5113 } } },
   ],
   lista: [
-    { lead_id: 34353712, aluno: "MAIK MATHEUS XAVIER DIAS DE MOURA", escola: "ineprotec", atendente: "INE - MARCELA RABELO", vendedor: "Marcela Rabelo do Carmo", atendentes_no_lead: 1, credito: 1.0, valor: 2400, valor_credito: 2400, curso: "Tecnico em Enfermagem", data_matricula: "2026-07-31T17:40:55+00:00", base_data: "Entrada em MATRICULA REALIZADA" },
-    { lead_id: 34261482, aluno: "RENATO DE SOUZA MONTEIRO", escola: "matricula_ead", atendente: "MAT - BRUNA PEREIRA", vendedor: "Bruna Pereira Benevides", atendentes_no_lead: 2, credito: 0.5, valor: 2200, valor_credito: 1100, curso: null, data_matricula: "2026-07-31T17:29:31+00:00", base_data: "DATA PAGAMENTO MATRICULA" },
-    { lead_id: 34174236, aluno: "ARIELA CARRARO", escola: "ineprotec", atendente: "(sem registro de atendimento)", vendedor: "(sem registro de atendimento)", atendentes_no_lead: 1, credito: 1.0, valor: 2513, valor_credito: 2513, curso: "Radiologia", data_matricula: "2026-07-31T11:32:12+00:00", base_data: "Fechamento do lead" },
+    { lead_id: 34353712, aluno: "MAIK MATHEUS XAVIER DIAS DE MOURA", escola: "ineprotec", atendente: "INE - MARCELA RABELO", vendedor: "Marcela Rabelo do Carmo", atendentes_no_lead: 1, credito: 1.0, valor: 2400, valor_credito: 2400, curso: "Tecnico em Enfermagem", cursos_no_lead: 1, data_matricula: "2026-07-31T17:40:55+00:00", base_data: "Entrada em MATRICULA REALIZADA" },
+    { lead_id: 34261482, aluno: "RENATO DE SOUZA MONTEIRO", escola: "matricula_ead", atendente: "MAT - BRUNA PEREIRA", vendedor: "Bruna Pereira Benevides", atendentes_no_lead: 2, credito: 0.5, valor: 2200, valor_credito: 1100, curso: "Tecnico em Mineracao", cursos_no_lead: 2, data_matricula: "2026-07-31T17:29:31+00:00", base_data: "DATA PAGAMENTO MATRICULA" },
+    { lead_id: 34174236, aluno: "ARIELA CARRARO", escola: "ineprotec", atendente: "(sem registro de atendimento)", vendedor: "(sem registro de atendimento)", atendentes_no_lead: 1, credito: 1.0, valor: 2513, valor_credito: 2513, curso: "Radiologia", cursos_no_lead: 1, data_matricula: "2026-07-31T11:32:12+00:00", base_data: "Fechamento do lead" },
   ],
-  diagnostico: { total_matriculas: 124.0, total_leads: 124, por_data_pagamento: 0, por_entrada_status: 105, por_fechamento: 19, sem_atendente: 2, compartilhadas: 1 },
+  diagnostico: { total_matriculas: 121.0, total_leads: 113, alunos_multi_curso: 8,
+    matriculas_multi_curso: 16, sem_atendente: 1, compartilhadas: 0, sem_curso: 0,
+    sem_data_pagamento: 2 },
+  pendencias: [{ id: 1, name: "ALUNO SEM DATA A", school: "ineprotec" },
+               { id: 2, name: "ALUNO SEM DATA B", school: "matricula_ead" }],
 };
 
 // BASE=canonico simula o periodo inteiro datado por DATA PAGAMENTO MATRICULA
@@ -138,10 +142,13 @@ await new Promise((r) => setTimeout(r, 600));
 passos.push(["abriu a aba Matrículas & Auditoria", okAba]);
 
 const t2 = root.textContent || "";
-passos.push([CANONICO ? "mostrou o selo de critério definitivo" : "mostrou o aviso de base provisória",
-  CANONICO
-    ? (/Contagem por DATA PAGAMENTO MATRICULA/.test(t2) && !/ainda não sincronizado/.test(t2))
-    : (/DATA PAGAMENTO MATRICULA ainda não sincronizado/.test(t2))]);
+passos.push(["explicou a regra de contagem por curso",
+  /Critério conferido contra a planilha/.test(t2) && /A unidade contada é o/.test(t2)]);
+passos.push(["marcou aluno com mais de um curso", /2 cursos/.test(t2)]);
+passos.push(["mostrou o curso como propriedade da matrícula",
+  /Tecnico em Mineracao/.test(t2) && /Radiologia/.test(t2)]);
+passos.push(["alertou sobre matrículas fora da contagem",
+  /não estão sendo contadas/.test(t2) && /ALUNO SEM DATA A/.test(t2)]);
 passos.push(["listou atendentes", /JESSICA ALVES/.test(t2) && /BRUNA PEREIRA/.test(t2)]);
 passos.push(["trouxe o relatório nominal", /MAIK MATHEUS/.test(t2) && /ARIELA CARRARO/.test(t2)]);
 passos.push(["sinalizou matrícula dividida", /0,5/.test(t2)]);
