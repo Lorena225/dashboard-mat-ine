@@ -197,6 +197,35 @@ onde mora a decisão.
 > explicando a diferença; unificar depende da mesma decisão pendente sobre a base da
 > aba Vendedores.
 
+## Orgânico (Instagram e Facebook)
+
+Bloco **Alcance orgânico** no menu Marketing, alimentado pela edge function
+`social-sync` (cron diário 06:25) e pela RPC `dashboard_social`.
+
+Credenciais em `META_ORGANIC_SOURCES` no Vault: por escola, o `page_id`, o
+`ig_id` e o token do usuário de sistema. **Não guardamos token de página** —
+ele é derivado em execução via `GET /{page_id}?fields=access_token`.
+
+### Mapa da API levantado empiricamente (04/08/2026)
+
+A documentação do Meta está atrás da realidade; isto foi testado métrica a métrica.
+
+| Instagram | Situação |
+|---|---|
+| `reach` | série diária, janelas de no máximo 30 dias |
+| `follower_count` | série diária, **só os últimos 30 dias** |
+| `profile_views`, `website_clicks`, `accounts_engaged`, `total_interactions` | exigem `metric_type=total_value`; devolvem agregado, não série |
+| `impressions` | **removida** |
+
+| Facebook (exige token DE PÁGINA) | Situação |
+|---|---|
+| `page_post_engagements`, `page_daily_follows`, `page_daily_follows_unique`, `page_views_total`, `page_total_actions` | funcionam |
+| `page_impressions`, `page_fans`, `page_impressions_unique` | **removidas** |
+
+Por isso a tabela `social_daily` é esparsa por natureza. **Coluna nula significa
+"a plataforma não fornece mais", não "faltou sincronizar"** — e o painel escreve
+*não fornecido* em vez de mostrar zero, que seria mentira.
+
 ## Auditoria e qualidade do dado
 
 O painel foi auditado em 04/08/2026 (bateria em `supabase/migrations/20260804_auditoria_completa.sql`).

@@ -103,6 +103,25 @@ w.fetch = async (url) => ({
   status: 200,
   json: async () => {
     if (String(url).includes("dashboard_matriculas")) return MAT;
+    if (String(url).includes("dashboard_social")) return {
+      resumo: [
+        { school: "ineprotec", network: "instagram", handle: "ineprotec", seguidores: 6633,
+          publicacoes: 374, alcance: 9633, novos: 18, engajamento: 91, visitas: 200,
+          cliques: 29, dias: 31, alcance_ant: 8100, novos_ant: 12 },
+        { school: "matricula_ead", network: "instagram", handle: "matricula_ead", seguidores: 6911,
+          publicacoes: 300, alcance: 51402, novos: 31, engajamento: 227, visitas: 174,
+          cliques: 16, dias: 31, alcance_ant: 40000, novos_ant: 20 },
+        { school: "ineprotec", network: "facebook", handle: "Ineprotec - Escola Técnica",
+          seguidores: 785, alcance: null, novos: 1, engajamento: 433, visitas: 172,
+          cliques: null, dias: 31 },
+      ],
+      posts: [
+        { id: "ig_1", school: "ineprotec", network: "instagram", posted_at: "2026-07-15T12:00:00+0000",
+          tipo: "CAROUSEL_ALBUM", permalink: "https://instagram.com/p/x", legenda: "Escolher uma instituição de ensino",
+          curtidas: 84, comentarios: 6, compart: 0, interacoes: 90 },
+      ],
+      cadencia: [{ school: "ineprotec", network: "instagram", publicados: 8, por_semana: 1.8 }],
+    };
     if (String(url).includes("dashboard_marketing_resumo")) return {
       por_escola: [
         { school: "ineprotec", investimento: 4614.35, orcamento: 2500, leads: 626,
@@ -353,6 +372,12 @@ passos.push(["mostrou meta batida e meta perdida",
   /176% da meta/.test(tm2) && /82% da meta/.test(tm2)]);
 passos.push(["deu o veredito em linguagem simples",
   /pede revisão antes de liberar mais verba/.test(tm2)]);
+passos.push(["trouxe o bloco de alcance orgânico",
+  /Alcance orgânico/.test(tm2) && /6.633/.test(tm2) && /ineprotec/.test(tm2)]);
+passos.push(["mostrou ritmo de publicação",
+  /1,8 publicações por semana/.test(tm2)]);
+passos.push(["listou as publicações que mais engajaram",
+  /Publicações que mais engajaram/.test(tm2) && /Escolher uma instituição/.test(tm2)]);
 passos.push(["declarou para quem é cada seção",
   /Detalhe da mídia paga/.test(tm2) && /De onde vem o resultado/.test(tm2)]);
 passos.push(["removeu os blocos vazios de jargão",

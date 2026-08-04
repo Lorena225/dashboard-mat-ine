@@ -2266,6 +2266,145 @@ function SecaoPara({ titulo, para }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────
+// Orgânico: o que a marca constrói sem pagar mídia.
+// Nem toda métrica existe nas duas redes — o Meta removeu alcance e
+// cliques no site do lado do Facebook. Onde a plataforma não entrega,
+// mostramos "não fornecido" em vez de zero, que seria mentira.
+// ─────────────────────────────────────────────────────────────
+function BlocoOrganico({ social, schools }) {
+  const [rede, setRede] = useState("instagram");
+  const dataBR = (v) => (v ? new Date(v).toLocaleDateString("pt-BR") : "—");
+  const resumo = ((social && social.resumo) || [])
+    .filter((r) => schools.includes(r.school) && r.network === rede);
+  const posts = ((social && social.posts) || [])
+    .filter((p) => schools.includes(p.school) && p.network === rede);
+  const cad = ((social && social.cadencia) || [])
+    .filter((c) => schools.includes(c.school) && c.network === rede);
+
+  if (!social) return null;
+
+  const REDES = [["instagram", "Instagram"], ["facebook", "Facebook"]];
+  const naoFornecido = (
+    <span style={{ color: T.muted, fontSize: 11, fontStyle: "italic" }}>não fornecido</span>
+  );
+
+  return (
+    <Panel title={<>Alcance orgânico — o que construímos sem pagar <Info texto="Dados das contas do Instagram e das páginas do Facebook, sem relação com anúncios. É o resultado do conteúdo publicado: quantas pessoas foram alcançadas, quantas passaram a seguir e o que cada post gerou. Serve para responder se o esforço de conteúdo está construindo audiência ou só ocupando agenda." /></>}>
+      <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
+        {REDES.map(([id, rot]) => (
+          <button key={id} onClick={() => setRede(id)}
+            style={{
+              fontFamily: font, fontSize: 11.5, padding: "6px 14px", borderRadius: 999, cursor: "pointer",
+              border: `1px solid ${rede === id ? T.text : T.border}`,
+              background: rede === id ? T.text : T.panel,
+              color: rede === id ? T.panel : T.muted,
+              fontWeight: rede === id ? 600 : 400,
+            }}>{rot}</button>
+        ))}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 16 }}>
+        {resumo.map((r) => {
+          const esc = SCHOOLS[r.school] || {};
+          const c = cad.find((x) => x.school === r.school);
+          const deltaAlc = r.alcance != null && r.alcance_ant
+            ? (r.alcance - r.alcance_ant) / r.alcance_ant : null;
+          return (
+            <div key={r.school} style={{
+              border: `1px solid ${T.border}`, borderTop: `3px solid ${esc.color}`,
+              borderRadius: 10, padding: "14px 16px", background: T.panel,
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <SchoolTag school={r.school} />
+                {r.handle && <span style={{ fontSize: 11.5, color: T.muted }}>
+                  {rede === "instagram" ? "@" : ""}{r.handle}
+                </span>}
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+                <div>
+                  <div style={{ fontSize: 10.5, color: T.muted }}>Seguidores hoje</div>
+                  <div style={{ fontSize: 19, fontWeight: 700, color: esc.color }}>{num(r.seguidores)}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10.5, color: T.muted }}>Ganhos no período</div>
+                  <div style={{ fontSize: 19, fontWeight: 700 }}>
+                    {r.novos != null ? `+${num(r.novos)}` : naoFornecido}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 8 }}>
+                {[
+                  ["Pessoas alcançadas", r.alcance, deltaAlc],
+                  ["Interações no conteúdo", r.engajamento, null],
+                  ["Visitas ao perfil", r.visitas, null],
+                  ["Cliques no link", r.cliques, null],
+                  ["Publicações no período", c ? c.publicados : null, null],
+                ].map(([rot, val, delta]) => (
+                  <div key={rot} style={{ display: "flex", justifyContent: "space-between",
+                                          alignItems: "baseline", padding: "4px 0", fontSize: 12 }}>
+                    <span style={{ color: T.muted }}>{rot}</span>
+                    <span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+                      {val == null ? naoFornecido : num(val)}
+                      {delta != null && <span style={{ marginLeft: 6 }}><Delta value={delta} /></span>}
+                    </span>
+                  </div>
+                ))}
+                {c && (
+                  <div style={{ fontSize: 10.5, color: T.muted, marginTop: 6 }}>
+                    Ritmo de {String(c.por_semana).replace(".", ",")} publicações por semana.
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {posts.length > 0 && (
+        <div style={{ marginTop: 18 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>
+            Publicações que mais engajaram
+          </div>
+          <DataTable
+            rows={posts.slice(0, 12)}
+            initialSort={{ key: "interacoes", dir: "desc" }}
+            pageSize={8}
+            columns={[
+              { key: "school", label: "Escola", render: (r) => <SchoolTag school={r.school} /> },
+              { key: "posted_at", label: "Data", render: (r) => dataBR(r.posted_at) },
+              { key: "tipo", label: "Tipo", render: (r) => (
+                  <span style={{ fontSize: 10.5, color: T.muted }}>
+                    {({ IMAGE: "Imagem", VIDEO: "Vídeo", CAROUSEL_ALBUM: "Carrossel", POST: "Post" })[r.tipo] || r.tipo}
+                  </span>
+                ) },
+              { key: "legenda", label: "Publicação", style: { whiteSpace: "normal", minWidth: 260 },
+                render: (r) => (
+                  r.permalink
+                    ? <a href={r.permalink} target="_blank" rel="noreferrer"
+                        style={{ color: T.text, textDecoration: "none", borderBottom: `1px dotted ${T.muted}` }}>
+                        {r.legenda || "(sem legenda)"}
+                      </a>
+                    : (r.legenda || "(sem legenda)")
+                ) },
+              { key: "curtidas", label: "Curtidas", style: { textAlign: "right" }, render: (r) => num(r.curtidas) },
+              { key: "comentarios", label: "Comentários", style: { textAlign: "right" }, render: (r) => num(r.comentarios) },
+              { key: "interacoes", label: "Total", style: { textAlign: "right" },
+                render: (r) => <b>{num(r.interacoes)}</b> },
+            ]}
+          />
+          <div style={{ fontSize: 11, color: T.muted, marginTop: 8, lineHeight: 1.6 }}>
+            Clique na legenda para abrir a publicação. Compare o que engajou com o que foi
+            publicado por obrigação de calendário — o padrão costuma aparecer rápido.
+          </div>
+        </div>
+      )}
+    </Panel>
+  );
+}
+
 function ResumoMarketing({ resumo, schools }) {
   const linhas = ((resumo && resumo.por_escola) || []).filter((r) => schools.includes(r.school));
   if (!linhas.length) return null;
@@ -2376,7 +2515,7 @@ function ResumoMarketing({ resumo, schools }) {
   );
 }
 
-function MenuMarketing({ mkt, qual, orig, schools, insg, mres }) {
+function MenuMarketing({ mkt, qual, orig, schools, insg, mres, social }) {
   const [canalSel, setCanalSel] = useState(null);
   const ins = (insg && insg.marketing) || {};
   const insEsc = ins.por_escola || {};
@@ -2428,6 +2567,11 @@ function MenuMarketing({ mkt, qual, orig, schools, insg, mres }) {
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <div>{schools.map(kpiRow)}</div>
+
+      <SecaoPara titulo="Marca e conteúdo"
+        para="O que as redes constroem sem verba de anúncio: audiência, alcance do conteúdo e o que cada publicação gerou." />
+
+      <BlocoOrganico social={social} schools={schools} />
 
       <SecaoPara titulo="Detalhe da mídia paga"
         para="Para quem cuida das campanhas: onde a verba está indo, quanto custa cada lead e quais campanhas fogem da média." />
@@ -3575,6 +3719,7 @@ export default function DashboardEdilvo() {
   const [insg, setInsg] = useState(null);
   const [crs, setCrs] = useState(null);
   const [mres, setMres] = useState(null);
+  const [social, setSocial] = useState(null);
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [applied, setApplied] = useState(null);
@@ -3637,9 +3782,10 @@ export default function DashboardEdilvo() {
       rpc("dashboard_insights", { p_token: RPC_TOKEN, p_from: from, p_to: to }),
       rpc("dashboard_cursos", { p_token: RPC_TOKEN, p_from: from, p_to: to }),
       rpc("dashboard_marketing_resumo", { p_token: RPC_TOKEN, p_from: from, p_to: to }),
+      rpc("dashboard_social", { p_token: RPC_TOKEN, p_from: from, p_to: to }),
     ])
-      .then(([j, m, x, w, s, jo, q, fl, rg, od, pp, mt, isg, cr, mr]) => {
-        setQual(q); setFila(fl); setReg(rg); setOrig(od); setPipe(pp); setMat(mt); setInsg(isg); setCrs(cr); setMres(mr);
+      .then(([j, m, x, w, s, jo, q, fl, rg, od, pp, mt, isg, cr, mr, so]) => {
+        setQual(q); setFila(fl); setReg(rg); setOrig(od); setPipe(pp); setMat(mt); setInsg(isg); setCrs(cr); setMres(mr); setSocial(so);
         if (w) { j = { ...j, vendedores: w.vendedores, cursos: w.cursos, faixas: w.faixas, vendedores_coorte: w.vendedores_coorte }; }
         setData(j); setMkt(m); setExtra(x); setSdr(s); setJor(jo); setLoading(false);
       })
@@ -3775,7 +3921,7 @@ export default function DashboardEdilvo() {
                     {aba === "jornada" && <AbaJornada jor={jor} schools={schools} insg={insg} />}
                   </>
                 )}
-                {menu === "marketing" && <MenuMarketing mkt={mkt} qual={qual} orig={orig} schools={schools} insg={insg} mres={mres} />}
+                {menu === "marketing" && <MenuMarketing mkt={mkt} qual={qual} orig={orig} schools={schools} insg={insg} mres={mres} social={social} />}
                 {menu === "home" && <MenuHome data={data} mkt={mkt} extra={extra} qual={qual} schools={schools} goTo={setMenu} />}
               </>
             )}
