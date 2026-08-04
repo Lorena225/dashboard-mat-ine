@@ -3116,6 +3116,9 @@ function AbaMatriculas({ mat, schools }) {
           <Kpi label="Data de pagamento inválida" value={num(diag.data_invalida)}
             accent={Number(diag.data_invalida) > 0 ? T.red : undefined}
             title="Campo preenchido com valor que não converte em data (ano errado, data sem ano). A matrícula fica FORA da contagem até a correção no Kommo." />
+          <Kpi label="No funil do aluno sem data" value={num(diag.sucesso_sem_data)}
+            accent={Number(diag.sucesso_sem_data) > 0 ? T.amber : undefined}
+            title="Cards fechados no período que estão no funil SUCESSO DO ALUNO sem data de pagamento. Ficam fora da contagem. A conferência com a planilha de julho indica que são atendimentos de alunos antigos, não matrículas perdidas — mas vale checar antes de fechar o mês: se algum for matrícula real, basta preencher a data no Kommo que ele entra." />
         </div>
 
         {Number(diag.sem_data_pagamento) > 0 && (

@@ -39,7 +39,7 @@ const MAT = {
   ],
   diagnostico: { total_matriculas: 121.0, total_leads: 113, alunos_multi_curso: 8,
     matriculas_multi_curso: 16, sem_atendente: 1, compartilhadas: 0, sem_curso: 0,
-    sem_data_pagamento: 2, data_invalida: 1 },
+    sem_data_pagamento: 2, data_invalida: 1, sucesso_sem_data: 27 },
   pendencias: [{ id: 1, name: "ALUNO SEM DATA A", school: "ineprotec" },
                { id: 2, name: "ALUNO SEM DATA B", school: "matricula_ead" }],
   pendencias_data: [{ id: 9, name: "ALUNA ANO ERRADO", school: "matricula_ead", valor: "08/06/2027" }],
@@ -233,6 +233,8 @@ passos.push(["trouxe insight por atendente no hover",
   titulos.some((t) => /Ticket 7% acima da média/.test(t))]);
 passos.push(["manteve a definição junto do insight",
   titulos.some((t) => /uma matrícula por curso/.test(t) && /concentra 40%/.test(t))]);
+passos.push(["contou os cards do funil do aluno sem data",
+  /No funil do aluno sem data/.test(t2) && /27/.test(t2)]);
 passos.push(["mostrou a pendência de data inválida com o valor digitado",
   /Data de pagamento que não converte/.test(t2) && /08\/06\/2027/.test(t2) && /ALUNA ANO ERRADO/.test(t2)]);
 passos.push(["alertou sobre matrículas fora da contagem",
