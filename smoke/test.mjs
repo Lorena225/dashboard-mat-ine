@@ -53,6 +53,17 @@ const MAT = {
   por_curso: [
     { curso: "TECNICO EM AGRIMENSURA", escola: "ineprotec", matriculas: 26, faturamento: 64637, ticket_medio: 2486 },
     { curso: "ESP. TEC. EM GEORREFERENCIAMENTO", escola: "ineprotec", matriculas: 21, faturamento: 38000, ticket_medio: 1809 },
+    { curso: "TECNICO EM ELETROTECNICA", escola: "ineprotec", matriculas: 11, faturamento: 22903, ticket_medio: 2082 },
+    { curso: "TECNICO EM ELETROTECNICA", escola: "matricula_ead", matriculas: 3, faturamento: 4643, ticket_medio: 1548 },
+    { curso: "TECNICO EM MINERACAO", escola: "matricula_ead", matriculas: 9, faturamento: 21949, ticket_medio: 2439 },
+    { curso: "TECNICO EM ELETROMECANICA", escola: "ineprotec", matriculas: 8, faturamento: 20080, ticket_medio: 2510 },
+    { curso: "TECNICO EM AGRICULTURA", escola: "matricula_ead", matriculas: 7, faturamento: 16594, ticket_medio: 2371 },
+    { curso: "TECNICO EM SEGURANCA DO TRABALHO", escola: "matricula_ead", matriculas: 7, faturamento: 12614, ticket_medio: 1802 },
+    { curso: "POS EM GEORREFERENCIAMENTO", escola: "ineprotec", matriculas: 6, faturamento: 13187, ticket_medio: 2198 },
+    { curso: "TECNICO EM QUIMICA", escola: "matricula_ead", matriculas: 6, faturamento: 16346, ticket_medio: 2724 },
+    { curso: "SUPLETIVO EJA MEDIO", escola: "matricula_ead", matriculas: 5, faturamento: 6504, ticket_medio: 1301 },
+    { curso: "TECNICO EM ACUCAR E ALCOOL", escola: "matricula_ead", matriculas: 3, faturamento: 6066, ticket_medio: 2022 },
+    { curso: "TECNICO EM AGROPECUARIA", escola: "matricula_ead", matriculas: 2, faturamento: 4438, ticket_medio: 2219 },
   ],
   por_forma: [
     { forma: "BOLETO PARCELADO", escola: "ineprotec", matriculas: 32, faturamento: 85565, ticket_medio: 2674 },
@@ -249,6 +260,12 @@ passos.push(["trouxe insight por atendente no hover",
   titulos.some((t) => /Ticket 7% acima da média/.test(t))]);
 passos.push(["manteve a definição junto do insight",
   titulos.some((t) => /uma matrícula por curso/.test(t) && /concentra 40%/.test(t))]);
+// O Recharts esta stubado neste teste (ver topo do arquivo), entao o SVG nunca
+// existe. Validamos o que e codigo nosso: a legenda do grafico e o alternador.
+passos.push(["montou o bloco do gráfico de cursos",
+  /Top 10 cursos/.test(t2) && /empilhadas por escola/.test(t2)]);
+passos.push(["ofereceu alternar entre volume e faturamento",
+  /Por matrículas/.test(t2) && /Por faturamento/.test(t2)]);
 passos.push(["trouxe o ranking de matrículas por curso",
   /Matrículas por curso/.test(t2) && /TECNICO EM AGRIMENSURA/.test(t2)]);
 passos.push(["trouxe o faturamento por forma de pagamento",

@@ -2977,6 +2977,7 @@ function RelatorioNominalMatriculas({ mat, agruparPor = "atendente" }) {
 //      o prefixo INE-/MAT- no nome do usuário é só parte do nome e não classifica nada —
 //      por isso o total de cada usuário vem aberto por escola.
 function AbaMatriculas({ mat, schools }) {
+  const [metricaCurso, setMetricaCurso] = useState("matriculas");
   if (!mat) return <Placeholder label="Carregando matrículas…" />;
 
   const diag = mat.diagnostico || {};
@@ -3002,6 +3003,39 @@ function AbaMatriculas({ mat, schools }) {
     .map((c) => ({ ...c, part: totalMat > 0 ? (100 * Number(c.matriculas || 0)) / totalMat : 0 }));
 
   const porForma = (mat.por_forma || []).filter((f) => schools.includes(f.escola));
+
+  // Grafico de cursos: barras horizontais porque nome de curso e longo demais
+  // para caber no eixo X. Empilhado por escola, ja que 6 dos 12 cursos do topo
+  // sao vendidos pelas duas. O alternador existe porque a ordem muda: Seguranca
+  // do Trabalho e 6o em volume e 9o em faturamento (ticket baixo).
+  const TOPO_CURSOS = 10;
+  const cursoChart = (() => {
+    const porNome = {};
+    porCurso.forEach((c) => {
+      const k = c.curso;
+      porNome[k] = porNome[k] || { curso: k, _m: 0, _f: 0 };
+      porNome[k][c.escola] = Number(c[metricaCurso === "faturamento" ? "faturamento" : "matriculas"] || 0);
+      porNome[k]._m += Number(c.matriculas || 0);
+      porNome[k]._f += Number(c.faturamento || 0);
+    });
+    const linhas = Object.values(porNome)
+      .sort((a, b) => (metricaCurso === "faturamento" ? b._f - a._f : b._m - a._m));
+    const topo = linhas.slice(0, TOPO_CURSOS);
+    const resto = linhas.slice(TOPO_CURSOS);
+    if (resto.length) {
+      const agr = { curso: `+ ${resto.length} outros cursos`, _m: 0, _f: 0, _agregado: true };
+      resto.forEach((r) => {
+        schools.forEach((e) => { agr[e] = (agr[e] || 0) + Number(r[e] || 0); });
+        agr._m += r._m; agr._f += r._f;
+      });
+      topo.push(agr);
+    }
+    // rotulo curto: o eixo tem largura fixa e nome longo vira reticencias
+    return topo.map((l) => ({
+      ...l,
+      label: l.curso.length > 30 ? l.curso.slice(0, 29) + "…" : l.curso,
+    }));
+  })();
 
   // consolida as escolas para os cartoes do topo do bloco
   const formasResumo = Object.values(
@@ -3127,6 +3161,77 @@ function AbaMatriculas({ mat, schools }) {
 
       {/* ── Ranking de matrículas por curso ── */}
       <Panel title={<>Matrículas por curso <Info texto="Ranking do que foi efetivamente vendido no período. Aluno com mais de um curso gera uma linha por curso, por isso a soma bate com o total de matrículas. Para comparar com o que foi PROCURADO (demanda que não virou venda), veja a aba Origem, Canal & Região." /></>}>
+        {/* alternador: a ordem por volume e por faturamento nao e a mesma */}
+        <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+          {[["matriculas", "Por matrículas"], ["faturamento", "Por faturamento"]].map(([id, rot]) => (
+            <button key={id} onClick={() => setMetricaCurso(id)}
+              style={{
+                fontFamily: font, fontSize: 11.5, padding: "6px 13px", borderRadius: 999,
+                cursor: "pointer",
+                border: `1px solid ${metricaCurso === id ? T.text : T.border}`,
+                background: metricaCurso === id ? T.text : T.panel,
+                color: metricaCurso === id ? T.panel : T.muted,
+                fontWeight: metricaCurso === id ? 600 : 400,
+              }}>{rot}</button>
+          ))}
+        </div>
+
+        <div style={{ width: "100%", height: Math.max(200, cursoChart.length * 34 + 34) }}>
+          <ResponsiveContainer>
+            <BarChart data={cursoChart} layout="vertical"
+              margin={{ top: 0, right: 52, left: 10, bottom: 0 }} barGap={2}>
+              <XAxis type="number" stroke={T.muted} fontSize={10} tickLine={false} axisLine={false}
+                allowDecimals={metricaCurso !== "matriculas"}
+                tickFormatter={(v) => metricaCurso === "faturamento"
+                  ? (v >= 1000 ? "R$ " + (v / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 0 }) + " mil" : "R$ " + v)
+                  : v} />
+              <YAxis type="category" dataKey="label" stroke={T.muted} fontSize={10.5}
+                width={210} tickLine={false} axisLine={false} />
+              <Tooltip cursor={{ fill: "#00000006" }} content={({ active, payload }) => {
+                if (!active || !payload?.length) return null;
+                const d = payload[0].payload;
+                return (
+                  <div style={{ background: T.panelSoft, border: `1px solid ${T.border}`, borderRadius: 8,
+                                padding: "9px 12px", fontSize: 12, fontFamily: font, maxWidth: 300 }}>
+                    <div style={{ marginBottom: 5, fontWeight: 600 }}>{d.curso}</div>
+                    {payload.filter((p) => p.value > 0).map((p, i) => (
+                      <div key={i} style={{ color: p.color }}>
+                        {p.name}: <b>{metricaCurso === "faturamento" ? moeda(p.value) : dec(p.value)}</b>
+                      </div>
+                    ))}
+                    {!d._agregado && (
+                      <div style={{ color: T.muted, marginTop: 5, fontSize: 11 }}>
+                        {dec(d._m)} matrícula(s) · {moeda(d._f)} · ticket {moeda(d._m > 0 ? d._f / d._m : 0)}
+                      </div>
+                    )}
+                  </div>
+                );
+              }} />
+              <Legend verticalAlign="top" align="right" iconType="circle" iconSize={8}
+                wrapperStyle={{ fontSize: 11, paddingBottom: 8 }} />
+              {schools.map((e, i) => (
+                <Bar key={e} dataKey={e} stackId="c" name={SCHOOLS[e].label}
+                  fill={SCHOOLS[e].color} maxBarSize={17}
+                  radius={i === schools.length - 1 ? [0, 4, 4, 0] : [0, 0, 0, 0]}>
+                  {i === schools.length - 1 && (
+                    <LabelList position="right" fill={T.muted} fontSize={10}
+                      valueAccessor={(entry) => {
+                        const d = entry.payload || entry;
+                        const t = metricaCurso === "faturamento" ? d._f : d._m;
+                        return t > 0 ? (metricaCurso === "faturamento" ? moeda(t) : dec(t)) : "";
+                      }} />
+                  )}
+                </Bar>
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div style={{ fontSize: 11, color: T.muted, margin: "6px 0 14px", lineHeight: 1.6 }}>
+          Top {TOPO_CURSOS} cursos; os demais somados na última barra. Barras empilhadas por escola —
+          vários cursos são vendidos pelas duas. Passe o cursor para ver volume, faturamento e ticket juntos.
+        </div>
+
         <DataTable
           rows={porCurso}
           initialSort={{ key: "matriculas", dir: "desc" }}
