@@ -680,8 +680,11 @@ function AbaVisaoGeral({ data, extra, qual, fila, schools }) {
 }
 
 // ── Aba 2: Funil & Perdas ──
-function AbaFunilPerdas({ data, schools }) {
+function AbaFunilPerdas({ data, schools, insg }) {
   const [catSel, setCatSel] = useState(null);
+  const insF = (insg && insg.funil) || {};
+  const insPerda = insF.por_escola || {};
+  const insSemMotivo = insF.sem_motivo || {};
   const [etapaSel, setEtapaSel] = useState(null);
   const [motivoSel, setMotivoSel] = useState(null);
   const categorias = ["Sumiu / não engajou", "Sem interesse real", "Preço / concorrência", "Lead de baixa qualidade", "Outros"];
@@ -712,7 +715,20 @@ function AbaFunilPerdas({ data, schools }) {
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
-      <Panel title="Perdas por Categoria de Objeções">
+      <Panel title={(() => {
+        // hover, nao clique: o componente Info abre por clique e o pedido era
+        // que a leitura aparecesse ao passar o mouse
+        const t = schools.map((e) => {
+          const p = [insPerda[e], insSemMotivo[e]].filter(Boolean).join(" ");
+          return p ? `${(SCHOOLS[e] || {}).label || e}: ${p}` : null;
+        }).filter(Boolean).join("\n\n");
+        return (
+          <span title={t || undefined}
+            style={t ? { borderBottom: `1px dotted ${T.muted}`, cursor: "help" } : undefined}>
+            Perdas por Categoria de Objeções
+          </span>
+        );
+      })()}>
         {catData.length ? (
           <div style={{ width: "100%", height: 230 }}>
             <ResponsiveContainer>
@@ -2048,8 +2064,11 @@ function AbaPipeline({ pipe, schools }) {
 }
 
 // ═══════════════ MENU 2: MARKETING ═══════════════
-function MenuMarketing({ mkt, qual, orig, schools }) {
+function MenuMarketing({ mkt, qual, orig, schools, insg }) {
   const [canalSel, setCanalSel] = useState(null);
+  const ins = (insg && insg.marketing) || {};
+  const insEsc = ins.por_escola || {};
+  const juntar = (base, extra) => (extra ? base + "\n\n" + extra : base);
   if (!mkt) return <div style={{ color: T.muted, fontSize: 13, padding: 30, textAlign: "center" }}>Carregando dados de mídia…</div>;
   const kpis = mkt.kpis.filter((k) => schools.includes(k.school));
   const kpisAnt = mkt.kpis_ant || [];
@@ -2068,9 +2087,9 @@ function MenuMarketing({ mkt, qual, orig, schools }) {
       <div key={school} style={{ marginBottom: 14 }}>
         <div style={{ marginBottom: 8 }}><SchoolTag school={school} /></div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(148px, 1fr))", gap: 10 }}>
-          <Kpi accent={c} label="Investimento" title="Soma do gasto em Meta Ads e Google Ads no período, pelas APIs das plataformas." value={brl(spend)} delta={deltaPct(spend, spendAnt)} invert />
-          <Kpi accent={c} label="Leads (mídia)" title="Leads que as próprias plataformas reportam como conversão. O Meta costuma reportar zero em campanhas de mensagem: nesses casos, use a contagem pela Origem do Kommo." value={num(leads)} delta={deltaPct(leads, leadsAnt)} />
-          <Kpi accent={c} label="CPL" title="Custo por lead: investimento do período dividido pelos leads reportados pelas plataformas de anúncio." value={cpl != null ? brl(cpl) : "—"} delta={cpl != null && cplAnt != null ? (cpl - cplAnt) / cplAnt : null} invert />
+          <Kpi accent={c} label="Investimento" title={juntar("Soma do gasto em Meta Ads e Google Ads no período, pelas APIs das plataformas.", insEsc[school])} value={brl(spend)} delta={deltaPct(spend, spendAnt)} invert />
+          <Kpi accent={c} label="Leads (mídia)" title={juntar("Leads que as próprias plataformas reportam como conversão. O Meta costuma reportar zero em campanhas de mensagem: nesses casos, use a contagem pela Origem do Kommo.", ins.rastreio)} value={num(leads)} delta={deltaPct(leads, leadsAnt)} />
+          <Kpi accent={c} label="CPL" title={juntar("Custo por lead: investimento do período dividido pelos leads reportados pelas plataformas de anúncio.", juntar(ins.comparativo || "", ins.atribuicao) || undefined)} value={cpl != null ? brl(cpl) : "—"} delta={cpl != null && cplAnt != null ? (cpl - cplAnt) / cplAnt : null} invert />
           <Kpi accent={c} label="Cliques" title="Cliques nos anúncios no período, somando Meta e Google." value={num(clicks)} />
           <Kpi accent={c} label="CPQL / ROAS" title="Custo por lead qualificado e retorno sobre investimento. Dependem de amarrar cada matrícula à campanha exata; com o rastreio por Origem já em uso, ligam assim que os nomes das campanhas do anúncio forem padronizados iguais aos valores gravados na Origem." value="—" />
         </div>
@@ -2975,6 +2994,7 @@ export default function DashboardEdilvo() {
   const [escola, setEscola] = useState("todas");
   const [aba, setAba] = useState("visao");
   const [mat, setMat] = useState(null);
+  const [insg, setInsg] = useState(null);
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [applied, setApplied] = useState(null);
@@ -3034,9 +3054,10 @@ export default function DashboardEdilvo() {
       rpc("dashboard_origem_detalhe", { p_token: RPC_TOKEN, p_from: from, p_to: to }),
       rpc("dashboard_pipeline", { p_token: RPC_TOKEN, p_from: from, p_to: to }),
       rpc("dashboard_matriculas", { p_token: RPC_TOKEN, p_from: from, p_to: to, p_school: null }),
+      rpc("dashboard_insights", { p_token: RPC_TOKEN, p_from: from, p_to: to }),
     ])
-      .then(([j, m, x, w, s, jo, q, fl, rg, od, pp, mt]) => {
-        setQual(q); setFila(fl); setReg(rg); setOrig(od); setPipe(pp); setMat(mt);
+      .then(([j, m, x, w, s, jo, q, fl, rg, od, pp, mt, isg]) => {
+        setQual(q); setFila(fl); setReg(rg); setOrig(od); setPipe(pp); setMat(mt); setInsg(isg);
         if (w) { j = { ...j, vendedores: w.vendedores, cursos: w.cursos, faixas: w.faixas, vendedores_coorte: w.vendedores_coorte }; }
         setData(j); setMkt(m); setExtra(x); setSdr(s); setJor(jo); setLoading(false);
       })
@@ -3162,7 +3183,7 @@ export default function DashboardEdilvo() {
                   <>
                     {aba === "visao" && <AbaVisaoGeral data={data} extra={extra} qual={qual} fila={fila} schools={schools} />}
                     {aba === "pipeline" && <AbaPipeline pipe={pipe} schools={schools} />}
-                    {aba === "funil" && <AbaFunilPerdas data={data} schools={schools} />}
+                    {aba === "funil" && <AbaFunilPerdas data={data} schools={schools} insg={insg} />}
                     {aba === "vendedores" && <AbaVendedores data={data} schools={schools} mat={mat} />}
                     {aba === "matriculas" && <AbaMatriculas mat={mat} schools={schools} />}
                     {aba === "origem" && <AbaOrigem data={data} extra={extra} reg={reg} schools={schools} />}
@@ -3172,7 +3193,7 @@ export default function DashboardEdilvo() {
                     {aba === "jornada" && <AbaJornada jor={jor} schools={schools} />}
                   </>
                 )}
-                {menu === "marketing" && <MenuMarketing mkt={mkt} qual={qual} orig={orig} schools={schools} />}
+                {menu === "marketing" && <MenuMarketing mkt={mkt} qual={qual} orig={orig} schools={schools} insg={insg} />}
                 {menu === "home" && <MenuHome data={data} mkt={mkt} extra={extra} qual={qual} schools={schools} goTo={setMenu} />}
               </>
             )}

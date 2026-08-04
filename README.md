@@ -100,6 +100,9 @@ genérico do tipo "acompanhe de perto" — isso só ensina o gestor a ignorar o
 tooltip. Como as frases são geradas no banco a partir do período consultado,
 elas nunca ficam desatualizadas e acompanham qualquer filtro.
 
+As frases vêm da RPC `dashboard_insights(token, from, to)`, **deliberadamente separada**
+das RPCs de dados: acrescentar leitura estratégica nunca põe em risco os números do painel.
+
 O que é computado:
 
 | Onde | Leitura |
@@ -109,8 +112,35 @@ O que é computado:
 | KPI "Matrículas no período" | Concentração da operação: quanto o primeiro colocado representa e risco de dependência |
 | KPI "Alunos com mais de um curso" | Taxa de cross-sell do período |
 
-Quando não há base comparável (período anterior vazio), a frase é omitida em vez
-de inventar tendência.
+### Marketing
+
+| Onde | Leitura |
+|---|---|
+| KPI Investimento | Gasto por plataforma, custo por lead, custo por matrícula, retorno por real investido e conversão lead→matrícula |
+| KPI Leads (mídia) | Alerta quando uma plataforma recebeu verba e devolveu zero conversões |
+| KPI CPL | Comparativo de custo por matrícula entre as escolas e ressalva sobre atribuição |
+
+### Funil & Perdas
+
+| Onde | Leitura |
+|---|---|
+| Painel de perdas | Motivo mais frequente por escola, com a interpretação do que aquele motivo indica, e alerta de perdas sem motivo preenchido |
+
+### Guardas contra insight falso
+
+Duas travas importantes, ambas motivadas por erros reais encontrados ao construir:
+
+- **Base incompleta não vira tendência.** O período anterior só é usado para
+  comparação se tiver ao menos 80% dos dias com dado, inclusive de Google.
+  Sem isso, junho/2026 (com carga parcial do Google) produzia "+4.762% de
+  investimento", número que não significava nada.
+- **CPL por canal não é calculado a partir da origem.** Em jul/2026, 774 leads
+  chegam marcados como `SITE` enquanto Meta e Google somam poucas dezenas, embora
+  concentrem todo o investimento — o campo não separa tráfego pago de orgânico.
+  Os cálculos usam investimento por conta, que é confiável, e o painel explica
+  essa limitação no lugar de exibir um número inventado.
+
+Quando não há base comparável, a frase é omitida em vez de inventar tendência.
 
 ## RPCs
 

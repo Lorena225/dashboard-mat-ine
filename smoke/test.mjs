@@ -73,6 +73,22 @@ w.fetch = async (url) => ({
   status: 200,
   json: async () => {
     if (String(url).includes("dashboard_matriculas")) return MAT;
+    if (String(url).includes("dashboard_insights")) return {
+      matriculas: MAT.insights,
+      marketing: {
+        por_escola: {
+          ineprotec: "Investimento de R$ 4.614 no período. Custo por matrícula R$ 58,41.",
+          matricula_ead: "Investimento de R$ 8.945 no período. Custo por matrícula R$ 198,78.",
+        },
+        comparativo: "Custo por matrícula: R$ 198,78 na Matrícula EAD contra R$ 58,41 na Ineprotec.",
+        rastreio: "O Meta recebeu R$ 4.031 no período mas devolveu zero conversões registradas.",
+        atribuicao: "774 leads do período estão marcados como SITE.",
+      },
+      funil: {
+        por_escola: { matricula_ead: "179 perdas no período. O motivo mais frequente é CURSO NAO ENCONTRADO." },
+        sem_motivo: { matricula_ead: "12% das perdas estão sem motivo preenchido." },
+      },
+    };
     if (String(url).includes("data_freshness")) return { kommo: new Date().toISOString() };
     // As demais RPCs nao sao o alvo do teste.
     // dashboard_comercial e _v3 sofrem spread ({...j}) no app, entao precisam ser
@@ -204,6 +220,24 @@ passos.push(["manteve os nomes dos alunos no relatório", /MAIK MATHEUS/.test(t3
 const paineis = [...w.document.querySelectorAll("h2")].map((h) => (h.textContent || "").trim());
 passos.push(["posicionou o relatório como último bloco da página",
   /Matrículas por vendedor/.test(paineis[paineis.length - 1] || "")]);
+
+const okFunil = clicar("Funil & Perdas");
+await new Promise((r) => setTimeout(r, 450));
+const tf = [...w.document.querySelectorAll("[title]")].map((e) => e.getAttribute("title") || "");
+passos.push(["abriu a aba Funil & Perdas", okFunil]);
+passos.push(["trouxe insight de perdas no hover",
+  tf.some((t) => /CURSO NAO ENCONTRADO/.test(t) && /12% das perdas/.test(t))]);
+
+const okMkt = clicar("Marketing");
+await new Promise((r) => setTimeout(r, 550));
+const tm = [...w.document.querySelectorAll("[title]")].map((e) => e.getAttribute("title") || "");
+passos.push(["abriu o menu Marketing", okMkt]);
+passos.push(["trouxe insight de investimento no hover",
+  tm.some((t) => /Custo por matrícula R\$ 58,41/.test(t))]);
+passos.push(["alertou sobre o Meta sem conversões",
+  tm.some((t) => /zero conversões registradas/.test(t))]);
+passos.push(["avisou sobre a atribuição por origem",
+  tm.some((t) => /marcados como SITE/.test(t))]);
 
 let falhou = false;
 for (const [nome, ok] of passos) {
