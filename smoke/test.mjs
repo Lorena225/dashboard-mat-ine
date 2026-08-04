@@ -98,11 +98,36 @@ w.addEventListener("error", (e) => erros.push("window.error: " + e.message));
 w.console.error = (...a) => erros.push("console.error: " + a.join(" "));
 
 w.EDILVO_ANON_KEY = "test-key";
-w.fetch = async (url) => ({
+w.fetch = async (url, opts) => ({
   ok: true,
   status: 200,
   json: async () => {
     if (String(url).includes("dashboard_matriculas")) return MAT;
+    if (String(url).includes("dashboard_canal")) {
+      // o canal vem no corpo do POST da RPC
+      const meta = /"p_channel"\s*:\s*"meta"/.test(String(opts?.body || ""));
+      return meta ? {
+        canal: "meta",
+        por_escola: [{ school: "matricula_ead", gasto: 3472.59, impressoes: 74858, alcance: 63786,
+          cliques: 1095, cliques_link: 875, conversoes: 0, campanhas: 2, ctr: 1.46,
+          cpc: 3.17, cpm: 46.39, custo_conversao: null, frequencia: 1.17 }],
+        campanhas: [{ school: "matricula_ead", campaign_id: "1", campaign_name: "BY | Engajamento - WhatsApp",
+          gasto: 3255.51, impressoes: 71782, alcance: 61000, cliques: 1018, conversoes: 0,
+          ctr: 1.42, cpc: 3.2, custo_conversao: null }],
+        serie: [{ date: "2026-07-01", school: "matricula_ead", gasto: 120, cliques: 40, conversoes: 0 },
+                { date: "2026-07-02", school: "matricula_ead", gasto: 140, cliques: 50, conversoes: 0 }],
+      } : {
+        canal: "google",
+        por_escola: [{ school: "ineprotec", gasto: 4055.56, impressoes: 20659, alcance: 0,
+          cliques: 1827, cliques_link: 0, conversoes: 129, campanhas: 3, ctr: 8.84,
+          cpc: 2.22, cpm: 196.31, custo_conversao: 31.44, frequencia: null }],
+        campanhas: [{ school: "ineprotec", campaign_id: "g1", campaign_name: "INE | Pesquisa | Agrimensura",
+          gasto: 2000, impressoes: 10000, alcance: 0, cliques: 900, conversoes: 70,
+          ctr: 9.0, cpc: 2.22, custo_conversao: 28.57 }],
+        serie: [{ date: "2026-07-01", school: "ineprotec", gasto: 130, cliques: 60, conversoes: 5 },
+                { date: "2026-07-02", school: "ineprotec", gasto: 150, cliques: 70, conversoes: 6 }],
+      };
+    }
     if (String(url).includes("dashboard_social")) return {
       resumo: [
         { school: "ineprotec", network: "instagram", handle: "ineprotec", seguidores: 6633,
@@ -364,6 +389,36 @@ await new Promise((r) => setTimeout(r, 550));
 const tm = [...w.document.querySelectorAll("[title]")].map((e) => e.getAttribute("title") || "");
 const tm2 = root.textContent || "";
 passos.push(["abriu o menu Marketing", okMkt]);
+{
+  const abaG = clicar("Google Ads");
+  await new Promise((r) => setTimeout(r, 450));
+  const tg = root.textContent || "";
+  passos.push(["abriu a aba Google Ads", abaG]);
+  passos.push(["mostrou conversões só no Google",
+    /Conversões/.test(tg) && /Custo por conversão/.test(tg) && !/Pessoas alcançadas/.test(tg)]);
+
+  const abaM = clicar("Meta Ads");
+  await new Promise((r) => setTimeout(r, 450));
+  const tmeta = root.textContent || "";
+  passos.push(["abriu a aba Meta Ads", abaM]);
+  passos.push(["mostrou alcance e frequência só no Meta",
+    /Pessoas alcançadas/.test(tmeta) && /1,2x em média|1,17/.test(tmeta)]);
+  passos.push(["alertou sobre o Meta sem conversões na aba própria",
+    /não registrou nenhuma conversão/.test(tmeta)]);
+
+  const abaO = clicar("Redes Orgânicas");
+  await new Promise((r) => setTimeout(r, 450));
+  const torg = root.textContent || "";
+  passos.push(["abriu a aba Redes Orgânicas", abaO && /Alcance orgânico/.test(torg)]);
+  passos.push(["trouxe seguidores e perfil no orgânico",
+    /6.633/.test(torg) && /ineprotec/.test(torg)]);
+  passos.push(["mostrou ritmo de publicação", /1,8 publicações por semana/.test(torg)]);
+  passos.push(["listou as publicações que mais engajaram",
+    /Publicações que mais engajaram/.test(torg) && /Escolher uma instituição/.test(torg)]);
+
+  clicar("Visão Geral");
+  await new Promise((r) => setTimeout(r, 450));
+}
 passos.push(["abriu o Marketing com o resumo para a direção",
   /O essencial do período/.test(tm2) && /Cada R\$ 1 investido virou/.test(tm2)]);
 passos.push(["comparou investimento com o orçamento do mês",
@@ -372,12 +427,6 @@ passos.push(["mostrou meta batida e meta perdida",
   /176% da meta/.test(tm2) && /82% da meta/.test(tm2)]);
 passos.push(["deu o veredito em linguagem simples",
   /pede revisão antes de liberar mais verba/.test(tm2)]);
-passos.push(["trouxe o bloco de alcance orgânico",
-  /Alcance orgânico/.test(tm2) && /6.633/.test(tm2) && /ineprotec/.test(tm2)]);
-passos.push(["mostrou ritmo de publicação",
-  /1,8 publicações por semana/.test(tm2)]);
-passos.push(["listou as publicações que mais engajaram",
-  /Publicações que mais engajaram/.test(tm2) && /Escolher uma instituição/.test(tm2)]);
 passos.push(["declarou para quem é cada seção",
   /Detalhe da mídia paga/.test(tm2) && /De onde vem o resultado/.test(tm2)]);
 passos.push(["removeu os blocos vazios de jargão",

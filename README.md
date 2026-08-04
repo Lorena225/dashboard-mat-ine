@@ -197,6 +197,31 @@ onde mora a decisão.
 > explicando a diferença; unificar depende da mesma decisão pendente sobre a base da
 > aba Vendedores.
 
+## Menu Marketing — quatro abas
+
+| Aba | Para quê |
+|---|---|
+| **Visão Geral** | O essencial para a direção, comparativo entre canais e a ponte mídia → comercial |
+| **Google Ads** | Só Google: impressões, cliques, CTR, conversões e custo por conversão |
+| **Meta Ads** | Só Meta: impressões, alcance, frequência, cliques e custo por clique |
+| **Redes Orgânicas** | Instagram e Facebook sem verba de mídia |
+
+As abas por plataforma existem porque **as duas não entregam as mesmas métricas**,
+e juntá-las numa tabela só obriga coluna vazia:
+
+| | Google | Meta |
+|---|---|---|
+| Impressões, cliques, CTR, CPC | sim | sim |
+| Alcance e frequência | **não fornece** | sim |
+| Conversões de plataforma | sim (139 dias em jul/2026) | **zero registrada** |
+
+Alimentadas pela RPC `dashboard_canal(token, from, to, channel)`, separada da
+`dashboard_marketing`. A aba do Meta abre com um alerta enquanto o canal receber
+verba e não registrar conversão.
+
+Conversão de plataforma **não é matrícula**: as duas abas dizem isso e apontam
+para o bloco "O essencial do período", que usa o critério conferido.
+
 ## Orgânico (Instagram e Facebook)
 
 Bloco **Alcance orgânico** no menu Marketing, alimentado pela edge function

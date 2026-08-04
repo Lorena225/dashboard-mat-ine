@@ -253,6 +253,8 @@ const SNAPSHOT = {
 // ── Utilitários ──
 const brl = (v) => "R$ " + Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 });
 const num = (v) => Number(v || 0).toLocaleString("pt-BR");
+// moeda com centavos, para custos unitarios (CPC, CPM) onde arredondar mente
+const brl2 = (v) => "R$ " + Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 // uma casa decimal quando ha fracao, inteiro quando nao ha (18,6 / 26)
 const dec1 = (v) => Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 1 });
 const pct = (v) => (v == null ? "—" : (v * 100).toFixed(1).replace(".", ",") + "%");
@@ -2405,6 +2407,156 @@ function BlocoOrganico({ social, schools }) {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════
+// Abas por plataforma. Existem porque Google e Meta NAO entregam as
+// mesmas metricas, e junta-las numa tabela so obriga coluna vazia:
+//
+//   Google -> impressoes, cliques, conversoes e custo por conversao.
+//             NAO fornece alcance nem frequencia.
+//   Meta   -> impressoes, alcance, frequencia, cliques no link.
+//             Em jul/2026 entregou ZERO conversoes (pixel a revisar).
+//
+// Cada aba mostra so o que sua plataforma realmente fornece.
+// ═══════════════════════════════════════════════════════════════
+function AbaCanal({ dados, schools, canal }) {
+  const nome = canal === "google" ? "Google Ads" : "Meta Ads";
+  if (!dados) return <Placeholder label={`Carregando ${nome}…`} />;
+
+  const porEscola = (dados.por_escola || []).filter((r) => schools.includes(r.school));
+  const camps = (dados.campanhas || []).filter((c) => schools.includes(c.school));
+  const serie = (dados.serie || []).filter((s) => schools.includes(s.school));
+
+  if (!porEscola.length) {
+    return (
+      <Panel title={nome}>
+        <div style={{ fontSize: 12.5, color: T.muted, lineHeight: 1.7 }}>
+          Nenhum dado de {nome} no período selecionado. Pode ser que as campanhas estivessem
+          pausadas, ou que a integração não tenha recebido carga — confira o indicador de
+          atualização no topo da página.
+        </div>
+      </Panel>
+    );
+  }
+
+  const totalGasto = porEscola.reduce((a, x) => a + Number(x.gasto || 0), 0);
+  const totalConv = porEscola.reduce((a, x) => a + Number(x.conversoes || 0), 0);
+
+  const porDia = {};
+  serie.forEach((d) => {
+    porDia[d.date] = porDia[d.date] || { date: d.date };
+    porDia[d.date][d.school] = Number(d.gasto || 0);
+  });
+  const linhaDias = Object.values(porDia).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+
+  return (
+    <div style={{ display: "grid", gap: 16 }}>
+      {canal === "meta" && totalGasto > 0 && totalConv === 0 && (
+        <div style={{
+          padding: "11px 14px", borderRadius: 10,
+          background: T.amber + T.tint, border: `1px solid ${T.amber}${T.tintForte}`,
+          borderLeft: `3px solid ${T.amber}`, fontSize: 12, lineHeight: 1.65,
+        }}>
+          <b>O Meta não registrou nenhuma conversão no período</b>, apesar de {brl(totalGasto)} investidos.
+          Sem esse retorno o algoritmo otimiza sem saber o que deu certo, e não há como avaliar o canal
+          isoladamente. Costuma ser configuração de pixel ou de evento — vale revisar antes de julgar o
+          desempenho pelos números abaixo.
+        </div>
+      )}
+
+      {porEscola.map((x) => {
+        const esc = SCHOOLS[x.school] || {};
+        return (
+          <Panel key={x.school} title={<span><SchoolTag school={x.school} /></span>}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(155px,1fr))", gap: 12 }}>
+              <Kpi accent={esc.color} label="Investimento" value={brl(x.gasto)}
+                sub={`${num(x.campanhas)} campanha(s) ativas`} />
+              <Kpi accent={esc.color} label="Impressões" value={num(x.impressoes)}
+                title="Quantas vezes o anúncio apareceu, contando repetições para a mesma pessoa." />
+              {canal === "meta" && (
+                <Kpi accent={esc.color} label="Pessoas alcançadas" value={num(x.alcance)}
+                  sub={x.frequencia ? `viram ${dec1(x.frequencia)}x em média` : null}
+                  title="Pessoas distintas que viram o anúncio. O Google Ads não fornece esta métrica." />
+              )}
+              <Kpi accent={esc.color} label="Cliques" value={num(x.cliques)}
+                sub={x.ctr != null ? `${dec1(x.ctr)}% de quem viu` : null}
+                title="Quantos clicaram. A porcentagem é o CTR: relação entre cliques e impressões." />
+              <Kpi accent={esc.color} label="Custo por clique" value={x.cpc != null ? brl2(x.cpc) : "—"} />
+              <Kpi accent={esc.color} label="Custo por mil impressões" value={x.cpm != null ? brl2(x.cpm) : "—"} />
+              {canal === "google" && (
+                <>
+                  <Kpi accent={esc.color} label="Conversões" value={num(x.conversoes)}
+                    title="Conversões registradas pelo próprio Google Ads. Não equivalem a matrículas." />
+                  <Kpi accent={esc.color} label="Custo por conversão"
+                    value={x.custo_conversao != null ? brl2(x.custo_conversao) : "—"} />
+                </>
+              )}
+            </div>
+          </Panel>
+        );
+      })}
+
+      {linhaDias.length > 1 && (
+        <Panel title={`Investimento dia a dia — ${nome}`}>
+          <div style={{ width: "100%", height: 230 }}>
+            <ResponsiveContainer>
+              <BarChart data={linhaDias} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                <XAxis dataKey="date" stroke={T.muted} fontSize={10} tickLine={false} axisLine={false}
+                  tickFormatter={(v) => String(v).slice(8, 10) + "/" + String(v).slice(5, 7)} />
+                <YAxis stroke={T.muted} fontSize={10} tickLine={false} axisLine={false} />
+                <Tooltip cursor={{ fill: "#00000006" }}
+                  formatter={(v, n) => [brl(v), (SCHOOLS[n] || {}).label || n]}
+                  labelFormatter={(v) => new Date(String(v) + "T12:00:00").toLocaleDateString("pt-BR")}
+                  contentStyle={{ background: T.panelSoft, border: `1px solid ${T.border}`,
+                                  borderRadius: 8, fontSize: 12, fontFamily: font }} />
+                <Legend verticalAlign="top" align="right" iconType="circle" iconSize={8}
+                  wrapperStyle={{ fontSize: 11, paddingBottom: 6 }}
+                  formatter={(v) => (SCHOOLS[v] || {}).label || v} />
+                {schools.map((e) => (
+                  <Bar key={e} dataKey={e} stackId="g" name={e} fill={SCHOOLS[e].color} maxBarSize={20} />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Panel>
+      )}
+
+      <Panel title={`Campanhas — ${nome}`}>
+        <DataTable
+          rows={camps}
+          initialSort={{ key: "gasto", dir: "desc" }}
+          pageSize={12}
+          columns={[
+            { key: "school", label: "Escola", render: (r) => <SchoolTag school={r.school} /> },
+            { key: "campaign_name", label: "Campanha", style: { whiteSpace: "normal", minWidth: 220 } },
+            { key: "gasto", label: "Investimento", style: { textAlign: "right" }, render: (r) => <b>{brl(r.gasto)}</b> },
+            { key: "impressoes", label: "Impressões", style: { textAlign: "right" }, render: (r) => num(r.impressoes) },
+            ...(canal === "meta"
+              ? [{ key: "alcance", label: "Alcance", style: { textAlign: "right" }, render: (r) => num(r.alcance) }]
+              : []),
+            { key: "cliques", label: "Cliques", style: { textAlign: "right" }, render: (r) => num(r.cliques) },
+            { key: "ctr", label: "CTR", style: { textAlign: "right" },
+              render: (r) => (r.ctr != null ? dec1(r.ctr) + "%" : "—") },
+            { key: "cpc", label: "Custo/clique", style: { textAlign: "right" },
+              render: (r) => (r.cpc != null ? brl2(r.cpc) : "—") },
+            ...(canal === "google"
+              ? [
+                  { key: "conversoes", label: "Conversões", style: { textAlign: "right" }, render: (r) => num(r.conversoes) },
+                  { key: "custo_conversao", label: "Custo/conv.", style: { textAlign: "right" },
+                    render: (r) => (r.custo_conversao != null ? brl2(r.custo_conversao) : "—") },
+                ]
+              : []),
+          ]}
+        />
+        <div style={{ fontSize: 11, color: T.muted, marginTop: 8, lineHeight: 1.6 }}>
+          {canal === "google"
+            ? "Conversões são as que o próprio Google Ads registra — não equivalem a matrículas. Para o número conferido, veja “O essencial do período” na Visão Geral."
+            : "O Meta fornece alcance e frequência, que o Google não tem; em compensação não está registrando conversões. Compare os canais pelo custo por matrícula da Visão Geral, não pelas conversões de plataforma."}
+        </div>
+      </Panel>
+    </div>
+  );
+}
+
 function ResumoMarketing({ resumo, schools }) {
   const linhas = ((resumo && resumo.por_escola) || []).filter((r) => schools.includes(r.school));
   if (!linhas.length) return null;
@@ -2515,7 +2667,7 @@ function ResumoMarketing({ resumo, schools }) {
   );
 }
 
-function MenuMarketing({ mkt, qual, orig, schools, insg, mres, social }) {
+function MenuMarketing({ mkt, qual, orig, schools, insg, mres }) {
   const [canalSel, setCanalSel] = useState(null);
   const ins = (insg && insg.marketing) || {};
   const insEsc = ins.por_escola || {};
@@ -2567,11 +2719,6 @@ function MenuMarketing({ mkt, qual, orig, schools, insg, mres, social }) {
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <div>{schools.map(kpiRow)}</div>
-
-      <SecaoPara titulo="Marca e conteúdo"
-        para="O que as redes constroem sem verba de anúncio: audiência, alcance do conteúdo e o que cada publicação gerou." />
-
-      <BlocoOrganico social={social} schools={schools} />
 
       <SecaoPara titulo="Detalhe da mídia paga"
         para="Para quem cuida das campanhas: onde a verba está indo, quanto custa cada lead e quais campanhas fogem da média." />
@@ -3686,6 +3833,15 @@ function AbaMatriculas({ mat, schools }) {
   );
 }
 
+// Marketing dividido por plataforma: Google e Meta entregam metricas
+// diferentes, e a visao geral e onde os dois se encontram com o resultado.
+const ABAS_MKT = [
+  { id: "geral", label: "Visão Geral" },
+  { id: "google", label: "Google Ads" },
+  { id: "meta", label: "Meta Ads" },
+  { id: "organico", label: "Redes Orgânicas" },
+];
+
 const ABAS = [
   { id: "visao", label: "Visão Geral" },
   { id: "pipeline", label: "Pipeline & Contato" },
@@ -3715,11 +3871,14 @@ export default function DashboardEdilvo() {
   const [periodo, setPeriodo] = useState("mes_atual");
   const [escola, setEscola] = useState("todas");
   const [aba, setAba] = useState("visao");
+  const [abaMkt, setAbaMkt] = useState("geral");
   const [mat, setMat] = useState(null);
   const [insg, setInsg] = useState(null);
   const [crs, setCrs] = useState(null);
   const [mres, setMres] = useState(null);
   const [social, setSocial] = useState(null);
+  const [canalGoogle, setCanalGoogle] = useState(null);
+  const [canalMeta, setCanalMeta] = useState(null);
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [applied, setApplied] = useState(null);
@@ -3783,9 +3942,11 @@ export default function DashboardEdilvo() {
       rpc("dashboard_cursos", { p_token: RPC_TOKEN, p_from: from, p_to: to }),
       rpc("dashboard_marketing_resumo", { p_token: RPC_TOKEN, p_from: from, p_to: to }),
       rpc("dashboard_social", { p_token: RPC_TOKEN, p_from: from, p_to: to }),
+      rpc("dashboard_canal", { p_token: RPC_TOKEN, p_from: from, p_to: to, p_channel: "google" }),
+      rpc("dashboard_canal", { p_token: RPC_TOKEN, p_from: from, p_to: to, p_channel: "meta" }),
     ])
-      .then(([j, m, x, w, s, jo, q, fl, rg, od, pp, mt, isg, cr, mr, so]) => {
-        setQual(q); setFila(fl); setReg(rg); setOrig(od); setPipe(pp); setMat(mt); setInsg(isg); setCrs(cr); setMres(mr); setSocial(so);
+      .then(([j, m, x, w, s, jo, q, fl, rg, od, pp, mt, isg, cr, mr, so, cg, cm]) => {
+        setQual(q); setFila(fl); setReg(rg); setOrig(od); setPipe(pp); setMat(mt); setInsg(isg); setCrs(cr); setMres(mr); setSocial(so); setCanalGoogle(cg); setCanalMeta(cm);
         if (w) { j = { ...j, vendedores: w.vendedores, cursos: w.cursos, faixas: w.faixas, vendedores_coorte: w.vendedores_coorte }; }
         setData(j); setMkt(m); setExtra(x); setSdr(s); setJor(jo); setLoading(false);
       })
@@ -3846,6 +4007,16 @@ export default function DashboardEdilvo() {
               <button key={m.id} onClick={() => setMenu(m.id)} aria-current={menu === m.id ? "page" : undefined} style={navItem(menu === m.id)}>{m.label}</button>
             ))}
           </nav>
+          {menu === "marketing" && (
+            <div className="subnav" style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.border}` }}>
+              {ABAS_MKT.map((a) => (
+                <button key={a.id} onClick={() => setAbaMkt(a.id)} aria-current={abaMkt === a.id ? "page" : undefined}
+                  style={{ ...navItem(abaMkt === a.id), fontSize: 12, padding: "8px 12px", background: abaMkt === a.id ? T.panelSoft : "transparent", color: T.ink, borderLeft: abaMkt === a.id ? `3px solid ${T.ink}` : "3px solid transparent", borderRadius: 6 }}>
+                  {a.label}
+                </button>
+              ))}
+            </div>
+          )}
           {menu === "comercial" && (
             <div className="subnav" style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.border}` }}>
               {ABAS.map((a) => (
@@ -3921,7 +4092,12 @@ export default function DashboardEdilvo() {
                     {aba === "jornada" && <AbaJornada jor={jor} schools={schools} insg={insg} />}
                   </>
                 )}
-                {menu === "marketing" && <MenuMarketing mkt={mkt} qual={qual} orig={orig} schools={schools} insg={insg} mres={mres} social={social} />}
+                {menu === "marketing" && <>
+                    {abaMkt === "geral" && <MenuMarketing mkt={mkt} qual={qual} orig={orig} schools={schools} insg={insg} mres={mres} />}
+                    {abaMkt === "google" && <AbaCanal dados={canalGoogle} schools={schools} canal="google" />}
+                    {abaMkt === "meta" && <AbaCanal dados={canalMeta} schools={schools} canal="meta" />}
+                    {abaMkt === "organico" && <BlocoOrganico social={social} schools={schools} />}
+                  </>}
                 {menu === "home" && <MenuHome data={data} mkt={mkt} extra={extra} qual={qual} schools={schools} goTo={setMenu} />}
               </>
             )}
