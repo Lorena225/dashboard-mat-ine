@@ -197,6 +197,24 @@ onde mora a decisão.
 > explicando a diferença; unificar depende da mesma decisão pendente sobre a base da
 > aba Vendedores.
 
+## Indicador de atualização — três estados
+
+O chip no topo distingue:
+
+| Estado | Significado | Cor |
+|---|---|---|
+| **ok** | dado recente | verde |
+| **pausado** | a integração funciona; a veiculação é que parou | âmbar |
+| **atrasado** | a integração parou de trazer dado — alguém precisa olhar | vermelho |
+
+O critério de "pausado" é inferido dos próprios dados, sem chamar a API: **se o
+último dia registrado é posterior ao último dia com investimento**, a plataforma
+ainda responde e o que parou foi a campanha.
+
+Isso existe porque "Meta 4d" em vermelho mandava o gestor caçar um problema
+técnico inexistente — as 30 campanhas do Meta estão pausadas desde 28/07, e o
+painel agora escreve isso em vez de alarmar.
+
 ## Menu Marketing — quatro abas
 
 | Aba | Para quê |

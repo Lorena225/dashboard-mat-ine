@@ -1844,33 +1844,44 @@ function AbaMetas({ data, periodoFrom, onSaved }) {
 function FreshChip({ fresh }) {
   const hoje = new Date();
   const diasDe = (v) => { if (!v) return null; const d = new Date(v); return Math.floor((hoje - d) / 86400000); };
+  const st = fresh.status || {};
   const itens = [
-    { lab: "Kommo", d: diasDe(fresh.kommo), lim: 1 },
-    { lab: "Google", d: diasDe(fresh.google), lim: 2 },
-    { lab: "Meta", d: diasDe(fresh.meta), lim: 2 },
-  ];
-  // Antes o atraso ficava so no tooltip de um ponto de 7px, e integracao parada
-  // passava despercebida ate alguem estranhar os numeros. Agora, quando a fonte
-  // passa do limite, o atraso aparece escrito ao lado do nome.
+    { lab: "Kommo", d: diasDe(fresh.kommo), lim: 1, chave: null },
+    { lab: "Google", d: diasDe(fresh.google), lim: 2, chave: "google" },
+    { lab: "Meta", d: diasDe(fresh.meta), lim: 2, chave: "meta" },
+    { lab: "Redes", d: diasDe(fresh.social), lim: 2, chave: null },
+  ].filter((i) => i.d != null);
+
+  // Tres estados, nao dois. "Meta 4d" em vermelho mandava o gestor cacar
+  // problema tecnico inexistente: as campanhas estavam pausadas. Quando a
+  // plataforma responde mas nao ha veiculacao, o chip diz "pausado" em ambar
+  // e explica no tooltip; o vermelho fica reservado a integracao parada.
   return (
     <span style={{ display: "inline-flex", gap: 8, alignItems: "center", marginRight: 6, fontSize: 11, color: T.muted }}>
       {itens.map((i) => {
-        const cor = i.d == null ? T.muted : i.d <= i.lim ? T.green : i.d <= i.lim + 3 ? T.amber : T.red;
-        const atrasado = i.d != null && i.d > i.lim;
+        const estado = i.chave ? (st[i.chave] || {}).status : null;
+        const pausado = estado === "pausado";
+        const atrasado = !pausado && i.d != null && i.d > i.lim;
+        const cor = pausado ? T.amber
+          : i.d == null ? T.muted
+          : i.d <= i.lim ? T.green
+          : i.d <= i.lim + 3 ? T.amber : T.red;
+        const ug = i.chave ? (st[i.chave] || {}).ultimo_gasto : null;
+        const titulo = pausado
+          ? `${i.lab} — a integração está funcionando; o que parou foi a veiculação. Último dia com investimento: ${ug ? new Date(ug + "T12:00:00").toLocaleDateString("pt-BR") : "—"}. Campanha pausada não gera dado novo: isso não é falha do painel.`
+          : `${i.lab} — última atualização: ${i.d == null ? "sem dados" : i.d === 0 ? "hoje" : i.d + " dia(s) atrás"}${atrasado ? ". A integração pode estar parada; os números deste período ficam incompletos." : ""}`;
+        const destacar = pausado || atrasado;
         return (
-          <span
-            key={i.lab}
-            title={`${i.lab} — última atualização: ${i.d == null ? "sem dados" : i.d === 0 ? "hoje" : i.d + " dia(s) atrás"}${atrasado ? ". A integração pode estar parada; os números deste período ficam incompletos." : ""}`}
+          <span key={i.lab} title={titulo}
             style={{
               display: "inline-flex", alignItems: "center", gap: 4,
-              ...(atrasado ? {
+              ...(destacar ? {
                 color: cor, fontWeight: 600, background: cor + T.tint,
                 border: `1px solid ${cor}${T.tintForte}`, borderRadius: 20, padding: "1px 7px",
               } : null),
-            }}
-          >
+            }}>
             <span style={{ width: 7, height: 7, borderRadius: 4, background: cor }} />
-            {i.lab}{atrasado ? ` ${i.d}d` : ""}
+            {i.lab}{pausado ? " pausado" : atrasado ? ` ${i.d}d` : ""}
           </span>
         );
       })}

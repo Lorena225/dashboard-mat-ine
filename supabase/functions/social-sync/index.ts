@@ -240,9 +240,11 @@ Deno.serve(async (req) => {
     }
   }
 
+  // a coluna e "key", nao "source": a versao anterior falhava em silencio
   await sb.from("sync_state").upsert({
-    source: "social_organico", last_run: new Date().toISOString(),
-  }, { onConflict: "source" });
+    key: "social_organico", last_run: new Date().toISOString(),
+    detail: { linhasDia, linhasPost, perfis },
+  }, { onConflict: "key" });
 
   return new Response(JSON.stringify({
     ok: true, perfis, linhasDia, linhasPost,

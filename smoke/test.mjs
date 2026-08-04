@@ -196,7 +196,17 @@ w.fetch = async (url, opts) => ({
         sem_motivo: { matricula_ead: "12% das perdas estão sem motivo preenchido." },
       },
     };
-    if (String(url).includes("data_freshness")) return { kommo: new Date().toISOString() };
+    if (String(url).includes("data_freshness")) {
+      const d = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+      return {
+        kommo: new Date().toISOString(),
+        google: d(1), meta: d(4), social: d(0),
+        status: {
+          google: { status: "ok", dias: 1, ultimo_gasto: d(1) },
+          meta: { status: "pausado", dias: 4, ultimo_gasto: d(7) },
+        },
+      };
+    }
     // essas duas abas so renderizam com linhas; sem elas caem em Placeholder
     if (String(url).includes("dashboard_sdr")) return {
       resumo: [{ school: "ineprotec", leads_recebidos: 5, em_triagem_agora: 0, leads_processados: 5,
@@ -467,6 +477,16 @@ passos.push(["trouxe o relatório de estados que mais vendem",
 passos.push(["calculou o ticket médio por estado", /2.195|2.196/.test(to)]);
 passos.push(["alertou sobre leads sem curso declarado",
   /Leads sem curso declarado/.test(to) && /44,2%/.test(to)]);
+
+{
+  const tf2 = root.textContent || "";
+  const tt = [...w.document.querySelectorAll("[title]")].map((e) => e.getAttribute("title") || "");
+  passos.push(["marcou o Meta como pausado, não como atrasado",
+    /Meta pausado/.test(tf2) && !/Meta 4d/.test(tf2)]);
+  passos.push(["explicou que pausado não é falha do painel",
+    tt.some((t) => /não é falha do painel/.test(t))]);
+  passos.push(["manteve o Google como saudável", /Google/.test(tf2) && !/Google \d+d/.test(tf2)]);
+}
 
 let falhou = false;
 for (const [nome, ok] of passos) {
