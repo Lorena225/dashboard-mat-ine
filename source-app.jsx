@@ -2783,6 +2783,12 @@ function AbaMatriculas({ mat, schools }) {
 
   const diag = mat.diagnostico || {};
   const porEscola = mat.por_escola || [];
+  // Insights vem calculados do banco: cada frase carrega o numero que a sustenta,
+  // entao nunca ficam desatualizados nem viram texto generico.
+  const ins = mat.insights || {};
+  const insEscola = ins.por_escola || {};
+  const insAtendente = ins.por_atendente || {};
+  const comInsight = (base, extra) => (extra ? base + "\n\n" + extra : base);
 
   const totalLeads = Number(diag.total_leads || 0);
   const canonico = totalLeads > 0 && Number(diag.por_data_pagamento || 0) === totalLeads;
@@ -2811,7 +2817,19 @@ function AbaMatriculas({ mat, schools }) {
         ? <span style={{ color: SCHOOLS[s].color, fontWeight: 600 }} title={moeda(r[`f_${s}`])}>{dec(r[`m_${s}`])}</span>
         : <span style={{ color: T.muted }}>—</span>),
     })),
-    { key: "matriculas", label: "Total", style: { textAlign: "right" }, render: (r) => <b>{dec(r.matriculas)}</b> },
+    {
+      key: "matriculas", label: "Total", style: { textAlign: "right" },
+      render: (r) => {
+        const nome = String(r.atendente || "").replace(/^(MAT|INE) - /, "");
+        const t = insAtendente[nome];
+        return (
+          <b
+            title={t || undefined}
+            style={t ? { borderBottom: `1px dotted ${T.muted}`, cursor: "help" } : undefined}
+          >{dec(r.matriculas)}</b>
+        );
+      },
+    },
     { key: "faturamento", label: "Faturamento", style: { textAlign: "right" }, render: (r) => moeda(r.faturamento) },
     {
       key: "compartilhadas", label: "Divididas", style: { textAlign: "right" },
@@ -2855,7 +2873,10 @@ function AbaMatriculas({ mat, schools }) {
             <Panel key={s} title={<SchoolTag school={s} />}>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(115px,1fr))", gap: 10 }}>
                 <Kpi label="Matrículas" value={dec(e.matriculas)} accent={SCHOOLS[s].color}
-                  title="Total da escola no período, pelo funil do lead. Matrícula com mais de um atendente no Registro de Atendimento entra fracionada no total por usuário, mas inteira no total da escola." />
+                  title={comInsight(
+                    "Total da escola no período, pelo funil do lead.",
+                    insEscola[s]
+                  )} />
                 <Kpi label="Faturamento" value={moeda(e.faturamento)} />
                 <Kpi label="Ticket médio" value={moeda(e.ticket_medio)} />
               </div>
@@ -2884,9 +2905,9 @@ function AbaMatriculas({ mat, schools }) {
       <Panel title={<>Consistência do período <Info texto="Casos que merecem conferência manual no Kommo. Os dois primeiros já estão contados; os dois últimos ficam de fora da contagem até serem corrigidos na origem." /></>}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 12 }}>
           <Kpi label="Matrículas no período" value={dec(diag.total_matriculas)}
-            title="Soma de todas as escolas, contando uma matrícula por curso." />
+            title={comInsight("Soma de todas as escolas, contando uma matrícula por curso.", ins.concentracao)} />
           <Kpi label="Alunos com mais de um curso" value={num(diag.alunos_multi_curso)}
-            title="Cada curso listado no lead vira uma matrícula. Estes alunos entram no relatório em mais de uma linha." />
+            title={comInsight("Cada curso listado no lead vira uma matrícula.", ins.cross_sell)} />
           <Kpi label="Sem Registro de Atendimento" value={num(diag.sem_atendente)}
             accent={Number(diag.sem_atendente) > 0 ? T.red : undefined}
             title="Contam para a escola, mas não são creditadas a nenhum vendedor. Preencher o campo no Kommo." />

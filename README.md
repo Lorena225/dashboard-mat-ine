@@ -90,6 +90,28 @@ Os dois fecham entre si. Em julho/2026: Ineprotec 78 (43 Jessica + 26 Marcela + 
 
 ---
 
+## Insights estratégicos (hover)
+
+Os tooltips da aba Matrículas & Auditoria trazem, além da definição da métrica,
+uma leitura estratégica calculada por `insights_matriculas(from, to)`.
+
+Regra de projeto: **toda frase carrega o número que a sustenta**. Nada de texto
+genérico do tipo "acompanhe de perto" — isso só ensina o gestor a ignorar o
+tooltip. Como as frases são geradas no banco a partir do período consultado,
+elas nunca ficam desatualizadas e acompanham qualquer filtro.
+
+O que é computado:
+
+| Onde | Leitura |
+|---|---|
+| KPI de matrículas por escola | Volume e ticket contra o período anterior, com a interpretação do cruzamento (cresceu em volume mas caiu o ticket, etc.) |
+| Coluna Total, por atendente | Participação no período, ticket contra a média, taxa de cross-sell e especialização por escola |
+| KPI "Matrículas no período" | Concentração da operação: quanto o primeiro colocado representa e risco de dependência |
+| KPI "Alunos com mais de um curso" | Taxa de cross-sell do período |
+
+Quando não há base comparável (período anterior vazio), a frase é omitida em vez
+de inventar tendência.
+
 ## RPCs
 
 | RPC | Função |

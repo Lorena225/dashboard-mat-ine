@@ -40,6 +40,18 @@ const MAT = {
     sem_data_pagamento: 2 },
   pendencias: [{ id: 1, name: "ALUNO SEM DATA A", school: "ineprotec" },
                { id: 2, name: "ALUNO SEM DATA B", school: "matricula_ead" }],
+  insights: {
+    concentracao: "Jessica Alves concentra 40% das matrículas; os dois primeiros somam 65%.",
+    cross_sell: "8 de 116 alunos levaram mais de um curso (7%).",
+    por_escola: {
+      ineprotec: "79 matrículas contra 55 no período anterior (+44%).",
+      matricula_ead: "45 matrículas contra 38 no período anterior (+18%).",
+    },
+    por_atendente: {
+      "JESSICA ALVES": "Responde por 40% das matrículas do período. Ticket 7% acima da média.",
+      "BRUNA PEREIRA": "Responde por 26% das matrículas do período.",
+    },
+  },
 };
 
 // BASE=canonico simula o periodo inteiro datado por DATA PAGAMENTO MATRICULA
@@ -147,6 +159,16 @@ passos.push(["explicou a regra de contagem por curso",
 passos.push(["marcou aluno com mais de um curso", /2 cursos/.test(t2)]);
 passos.push(["mostrou o curso como propriedade da matrícula",
   /Tecnico em Mineracao/.test(t2) && /Radiologia/.test(t2)]);
+// os insights ficam em atributos title (hover), nao no texto visivel
+const titulos = [...w.document.querySelectorAll("[title]")].map((e) => e.getAttribute("title") || "");
+passos.push(["trouxe insight de concentração no hover",
+  titulos.some((t) => /concentra 40% das matrículas/.test(t))]);
+passos.push(["trouxe insight por escola no hover",
+  titulos.some((t) => /79 matrículas contra 55/.test(t))]);
+passos.push(["trouxe insight por atendente no hover",
+  titulos.some((t) => /Ticket 7% acima da média/.test(t))]);
+passos.push(["manteve a definição junto do insight",
+  titulos.some((t) => /uma matrícula por curso/.test(t) && /concentra 40%/.test(t))]);
 passos.push(["alertou sobre matrículas fora da contagem",
   /não estão sendo contadas/.test(t2) && /ALUNO SEM DATA A/.test(t2)]);
 passos.push(["listou atendentes", /JESSICA ALVES/.test(t2) && /BRUNA PEREIRA/.test(t2)]);
