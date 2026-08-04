@@ -126,6 +126,20 @@ O que é computado:
 |---|---|
 | Painel de perdas | Motivo mais frequente por escola, com a interpretação do que aquele motivo indica, e alerta de perdas sem motivo preenchido |
 
+### Pipeline, Região, Jornada e SDR
+
+| Onde | Leitura |
+|---|---|
+| Pipeline qualificado | Leads abertos, quanto está parado há mais de 14 dias e o tamanho da fila acumulada contra os leads novos do período |
+| Leads por grupo de origem | Dispersão de conversão entre estados com volume relevante |
+| Leads por canal de origem | Tempo entre criação do lead e matrícula, com a leitura sobre ciclo curto vs. follow-up estruturado |
+| Leads recebidos (SDR) | Cobertura do agente sobre o total de leads |
+
+O insight do SDR é deliberadamente diferente: com 6 leads em 1.445, qualquer taxa
+oscila com um caso a mais ou a menos. Em vez de exibir percentuais frágeis, o
+tooltip diz que a base é pequena e que o número relevante é a própria cobertura.
+Abaixo de 30 leads no período, é sempre esse o texto.
+
 ### Guardas contra insight falso
 
 Duas travas importantes, ambas motivadas por erros reais encontrados ao construir:

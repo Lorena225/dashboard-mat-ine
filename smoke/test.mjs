@@ -84,12 +84,33 @@ w.fetch = async (url) => ({
         rastreio: "O Meta recebeu R$ 4.031 no período mas devolveu zero conversões registradas.",
         atribuicao: "774 leads do período estão marcados como SITE.",
       },
+      pipeline: { por_escola: {
+        ineprotec: "10.183 leads abertos, 91,3% sem movimentação há mais de 14 dias.",
+        matricula_ead: "27.149 leads abertos, 94,7% sem movimentação há mais de 14 dias." } },
+      regiao: { dispersao: "SC converte 8,9% e PR converte 2,2% — 4,1x de diferença." },
+      jornada: { por_escola: {
+        ineprotec: "Metade fecha em até 0 dia(s). Ciclo curto.",
+        matricula_ead: "Metade fecha em até 2 dia(s)." } },
+      sdr: { cobertura: "O agente recebeu 6 leads dos 1.445 gerados no período (0,4%)." },
       funil: {
         por_escola: { matricula_ead: "179 perdas no período. O motivo mais frequente é CURSO NAO ENCONTRADO." },
         sem_motivo: { matricula_ead: "12% das perdas estão sem motivo preenchido." },
       },
     };
     if (String(url).includes("data_freshness")) return { kommo: new Date().toISOString() };
+    // essas duas abas so renderizam com linhas; sem elas caem em Placeholder
+    if (String(url).includes("dashboard_sdr")) return {
+      resumo: [{ school: "ineprotec", leads_recebidos: 5, em_triagem_agora: 0, leads_processados: 5,
+                 matriculas_diretas: 0, p_atendimento_humano: 5, convertidos_por_humano: 0,
+                 horas_medias_triagem: 11.6, perdas: 0, retornos: 0, sem_resposta: 0,
+                 receita_direta: 0, receita_pos_handoff: 0 }],
+      serie: [], destinos: [],
+    };
+    if (String(url).includes("dashboard_pipeline")) return {
+      etapas: [{ school: "ineprotec", etapa: "Negociação", qtd: 12, valor: 30000, sort: 1 }],
+      resumo: [{ school: "ineprotec", qualificado: 120, forecast: 50000, sem_resposta: 30 }],
+      aging: [], contactabilidade: [], forecast: [],
+    };
     // As demais RPCs nao sao o alvo do teste.
     // dashboard_comercial e _v3 sofrem spread ({...j}) no app, entao precisam ser
     // objetos reais. Os outros payloads nao sao copiados: um Proxy tolerante
@@ -238,6 +259,22 @@ passos.push(["alertou sobre o Meta sem conversões",
   tm.some((t) => /zero conversões registradas/.test(t))]);
 passos.push(["avisou sobre a atribuição por origem",
   tm.some((t) => /marcados como SITE/.test(t))]);
+
+// o teste ja navegou para o menu Marketing: volta ao Comercial antes das abas
+clicar("Comercial");
+await new Promise((r) => setTimeout(r, 400));
+
+for (const [rot, aba, re] of [
+  ["Pipeline & Contato", "Pipeline & Contato", /91,3% sem movimentação/],
+  ["Origem, Canal & Região", "Origem, Canal & Região", /SC converte 8,9%/],
+  ["Jornada & Origem", "Jornada & Origem", /Metade fecha em até 0 dia/],
+  ["Agente SDR", "Agente SDR", /6 leads dos 1.445/],
+]) {
+  const ok = clicar(aba);
+  await new Promise((r) => setTimeout(r, 420));
+  const tt = [...w.document.querySelectorAll("[title]")].map((e) => e.getAttribute("title") || "");
+  passos.push([`insight na aba ${rot}`, ok && tt.some((t) => re.test(t))]);
+}
 
 let falhou = false;
 for (const [nome, ok] of passos) {

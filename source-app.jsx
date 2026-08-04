@@ -1233,7 +1233,26 @@ function AbaVendedores({ data, schools, mat }) {
 }
 
 // ── Aba 4: Origem, Canal e Região ──
-function AbaOrigem({ data, extra, reg, schools }) {
+// Rotulo de painel com leitura estrategica no hover. Usado no lugar de <Info>,
+// que abre por clique, quando a intencao e que o texto apareca ao passar o mouse.
+function TituloComLeitura({ children, texto }) {
+  if (!texto) return <>{children}</>;
+  return (
+    <span title={texto} style={{ borderBottom: `1px dotted ${T.muted}`, cursor: "help" }}>
+      {children}
+    </span>
+  );
+}
+
+function AbaOrigem({ data, extra, reg, schools, insg }) {
+  const leitura = (bloco, chave) => {
+    const b = (insg && insg[bloco]) || {};
+    if (chave) return b[chave] || null;
+    const pe = b.por_escola || {};
+    return schools.map((e) => (pe[e] ? `${(SCHOOLS[e] || {}).label || e}: ${pe[e]}` : null))
+      .filter(Boolean).join("\n\n") || null;
+  };
+
   const [ufSel, setUfSel] = useState(null);
   const origensRows = data.origens.filter((o) => schools.includes(o.school))
     .map((o) => ({ ...o, conversao: o.leads > 0 ? o.matriculas / o.leads : 0 }));
@@ -1265,7 +1284,7 @@ function AbaOrigem({ data, extra, reg, schools }) {
   const cob = extra ? extra.cobertura.filter((c) => schools.includes(c.school)) : [];
   return (
     <div style={{ display: "grid", gap: 14 }}>
-      <Panel title="Leads por grupo de origem (normalizado)">
+      <Panel title={<TituloComLeitura texto={leitura("regiao","dispersao")}>Leads por grupo de origem (normalizado)</TituloComLeitura>}>
         {gruposChart.length ? <div style={{ width: "100%", height: Math.max(180, gruposChart.length * 36 + 40) }}>
           <ResponsiveContainer>
             <BarChart data={gruposChart} layout="vertical" margin={{ top: 0, right: 34, left: 10, bottom: 0 }} barGap={2}>
@@ -1724,7 +1743,15 @@ function FreshChip({ fresh }) {
 }
 
 // ── Aba 7: Agente SDR ──
-function AbaSDR({ sdr, schools }) {
+function AbaSDR({ sdr, schools, insg }) {
+  const leitura = (bloco, chave) => {
+    const b = (insg && insg[bloco]) || {};
+    if (chave) return b[chave] || null;
+    const pe = b.por_escola || {};
+    return schools.map((e) => (pe[e] ? `${(SCHOOLS[e] || {}).label || e}: ${pe[e]}` : null))
+      .filter(Boolean).join("\n\n") || null;
+  };
+
   if (!sdr) return <div style={{ color: T.muted, fontSize: 13, padding: 30, textAlign: "center" }}>Carregando métricas do agente…</div>;
   const resumo = (sdr.resumo || []).filter((r) => schools.includes(r.school));
   if (!resumo.length) return <Placeholder label="Sem movimentações na etapa de triagem no período" detail="O histórico de etapas é coletado por webhook — períodos anteriores à ativação não têm dados retroativos." />;
@@ -1737,7 +1764,8 @@ function AbaSDR({ sdr, schools }) {
       <div key={r.school} style={{ marginBottom: 14 }}>
         <div style={{ marginBottom: 8 }}><SchoolTag school={r.school} /></div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(148px, 1fr))", gap: 10 }}>
-          <Kpi accent={c} label="Leads recebidos" value={num(r.leads_recebidos)} />
+          <Kpi accent={c} label="Leads recebidos" value={num(r.leads_recebidos)}
+            title={leitura("sdr","cobertura") || undefined} />
           <Kpi accent={c} label="Na fila agora" value={num(r.em_triagem_agora)} />
           <Kpi accent={c} label="Processados" value={num(r.leads_processados)} />
           <Kpi accent={c} label="Matrículas diretas" value={num(r.matriculas_diretas)} />
@@ -1830,7 +1858,15 @@ function AbaSDR({ sdr, schools }) {
 }
 
 // ── Aba 8: Jornada & Origem ──
-function AbaJornada({ jor, schools }) {
+function AbaJornada({ jor, schools, insg }) {
+  const leitura = (bloco, chave) => {
+    const b = (insg && insg[bloco]) || {};
+    if (chave) return b[chave] || null;
+    const pe = b.por_escola || {};
+    return schools.map((e) => (pe[e] ? `${(SCHOOLS[e] || {}).label || e}: ${pe[e]}` : null))
+      .filter(Boolean).join("\n\n") || null;
+  };
+
   if (!jor) return <div style={{ color: T.muted, fontSize: 13, padding: 30, textAlign: "center" }}>Carregando jornada…</div>;
   const canais = (jor.por_canal || []).filter((c) => schools.includes(c.school));
   const origens = (jor.por_origem || []).filter((c) => schools.includes(c.school));
@@ -1860,7 +1896,7 @@ function AbaJornada({ jor, schools }) {
         ))}
       </div>
 
-      <Panel title="Leads por canal de origem">
+      <Panel title={<TituloComLeitura texto={leitura("jornada")}>Leads por canal de origem</TituloComLeitura>}>
         {canalChart.length ? (
           <div style={{ width: "100%", height: Math.max(180, canalChart.length * 38 + 40) }}>
             <ResponsiveContainer>
@@ -1963,7 +1999,15 @@ function AbaJornada({ jor, schools }) {
 
 
 // ── Aba: Pipeline & Contato ──
-function AbaPipeline({ pipe, schools }) {
+function AbaPipeline({ pipe, schools, insg }) {
+  const leitura = (bloco, chave) => {
+    const b = (insg && insg[bloco]) || {};
+    if (chave) return b[chave] || null;
+    const pe = b.por_escola || {};
+    return schools.map((e) => (pe[e] ? `${(SCHOOLS[e] || {}).label || e}: ${pe[e]}` : null))
+      .filter(Boolean).join("\n\n") || null;
+  };
+
   if (!pipe) return <div style={{ color: T.muted, fontSize: 13, padding: 30, textAlign: "center" }}>Carregando pipeline…</div>;
   const resumo = (pipe.resumo || []).filter((r) => schools.includes(r.school));
   const grupos = (pipe.grupos || []).filter((g) => schools.includes(g.school));
@@ -1980,7 +2024,7 @@ function AbaPipeline({ pipe, schools }) {
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
-      <Panel title={<span>Pipeline qualificado<Info texto="Pipeline qualificado exclui os leads em LEAD SEM RESPOSTA — contato nunca estabelecido não é oportunidade. O forecast ponderado multiplica o valor de cada lead pela probabilidade histórica da etapa: pré-matriculado 70%, negociação 40%, aguardando decisão 30%, follow-up 15%, triagem e potenciais 5%. É estimativa de fechamento, não promessa." /></span>}>
+      <Panel title={<span><TituloComLeitura texto={leitura("pipeline")}>Pipeline qualificado</TituloComLeitura><Info texto="Pipeline qualificado exclui os leads em LEAD SEM RESPOSTA — contato nunca estabelecido não é oportunidade. O forecast ponderado multiplica o valor de cada lead pela probabilidade histórica da etapa: pré-matriculado 70%, negociação 40%, aguardando decisão 30%, follow-up 15%, triagem e potenciais 5%. É estimativa de fechamento, não promessa." /></span>}>
         {resumo.map((r) => {
           const c = SCHOOLS[r.school].color;
           const pctQual = r.total_aberto > 0 ? r.qualificado / r.total_aberto : 0;
@@ -3182,15 +3226,15 @@ export default function DashboardEdilvo() {
                 {menu === "comercial" && (
                   <>
                     {aba === "visao" && <AbaVisaoGeral data={data} extra={extra} qual={qual} fila={fila} schools={schools} />}
-                    {aba === "pipeline" && <AbaPipeline pipe={pipe} schools={schools} />}
+                    {aba === "pipeline" && <AbaPipeline pipe={pipe} schools={schools} insg={insg} />}
                     {aba === "funil" && <AbaFunilPerdas data={data} schools={schools} insg={insg} />}
                     {aba === "vendedores" && <AbaVendedores data={data} schools={schools} mat={mat} />}
                     {aba === "matriculas" && <AbaMatriculas mat={mat} schools={schools} />}
-                    {aba === "origem" && <AbaOrigem data={data} extra={extra} reg={reg} schools={schools} />}
+                    {aba === "origem" && <AbaOrigem data={data} extra={extra} reg={reg} schools={schools} insg={insg} />}
                     {aba === "financeiro" && <AbaFinanceiro data={data} schools={schools} />}
                     {aba === "metas" && <AbaMetas data={data} periodoFrom={periodoAtualFrom} onSaved={() => setReload((r) => r + 1)} />}
-                    {aba === "sdr" && <AbaSDR sdr={sdr} schools={schools} />}
-                    {aba === "jornada" && <AbaJornada jor={jor} schools={schools} />}
+                    {aba === "sdr" && <AbaSDR sdr={sdr} schools={schools} insg={insg} />}
+                    {aba === "jornada" && <AbaJornada jor={jor} schools={schools} insg={insg} />}
                   </>
                 )}
                 {menu === "marketing" && <MenuMarketing mkt={mkt} qual={qual} orig={orig} schools={schools} insg={insg} />}
