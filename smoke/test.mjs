@@ -18,6 +18,8 @@ const MAT = {
   por_vendedor: [
     { vendedor: "Jessica Alves Torres", matriculas: 48.0, leads: 48, faturamento: 120670, compartilhadas: 0,
       escolas: { ineprotec: { matriculas: 43.0, faturamento: 108000 }, matricula_ead: { matriculas: 5.0, faturamento: 12670 } } },
+    { vendedor: "Pedro Henrique Reis dos Santos", matriculas: 6, leads: 6, faturamento: 13508, compartilhadas: 0,
+      multi_curso: 0, escolas: {} },
     { vendedor: "Bruna Pereira Benevides", matriculas: 29.5, leads: 30, faturamento: 65765, compartilhadas: 1,
       escolas: { matricula_ead: { matriculas: 28.5, faturamento: 63000 } } },
   ],
@@ -37,9 +39,10 @@ const MAT = {
   ],
   diagnostico: { total_matriculas: 121.0, total_leads: 113, alunos_multi_curso: 8,
     matriculas_multi_curso: 16, sem_atendente: 1, compartilhadas: 0, sem_curso: 0,
-    sem_data_pagamento: 2 },
+    sem_data_pagamento: 2, data_invalida: 1 },
   pendencias: [{ id: 1, name: "ALUNO SEM DATA A", school: "ineprotec" },
                { id: 2, name: "ALUNO SEM DATA B", school: "matricula_ead" }],
+  pendencias_data: [{ id: 9, name: "ALUNA ANO ERRADO", school: "matricula_ead", valor: "08/06/2027" }],
   insights: {
     concentracao: "Jessica Alves concentra 40% das matrículas; os dois primeiros somam 65%.",
     cross_sell: "8 de 116 alunos levaram mais de um curso (7%).",
@@ -135,6 +138,17 @@ w.fetch = async (url) => ({
     if (/dashboard_comercial(_v3)?\b/.test(String(url))) {
       const o = { periodo: {} };
       for (const k of CHAVES) o[k] = [];
+      if (/_v3/.test(String(url))) {
+        // base antiga divergindo do canonico, para acionar o aviso de duas bases
+        o.vendedores = [
+          { vendedor: "Jessica Alves Torres", school: "ineprotec", matriculas: 46, matr_total: 46,
+            leads_atribuidos: 78, perdas: 0, faixa_nome: "Super Meta", comissao: 1327,
+            faturamento: 104526, ticket_medio: 2272, dias_fechamento: 9.6, falta_proxima: null, generico: false },
+          { vendedor: "Pedro Henrique Reis dos Santos", school: "matricula_ead", matriculas: 10, matr_total: 10,
+            leads_atribuidos: 30, perdas: 0, faixa_nome: "Base", comissao: 70,
+            faturamento: 22438, ticket_medio: 2243, dias_fechamento: 5.2, falta_proxima: 5, generico: false },
+        ];
+      }
       return o;
     }
     return new Proxy({ periodo: {} }, {
@@ -219,6 +233,8 @@ passos.push(["trouxe insight por atendente no hover",
   titulos.some((t) => /Ticket 7% acima da média/.test(t))]);
 passos.push(["manteve a definição junto do insight",
   titulos.some((t) => /uma matrícula por curso/.test(t) && /concentra 40%/.test(t))]);
+passos.push(["mostrou a pendência de data inválida com o valor digitado",
+  /Data de pagamento que não converte/.test(t2) && /08\/06\/2027/.test(t2) && /ALUNA ANO ERRADO/.test(t2)]);
 passos.push(["alertou sobre matrículas fora da contagem",
   /não estão sendo contadas/.test(t2) && /ALUNO SEM DATA A/.test(t2)]);
 passos.push(["listou atendentes", /JESSICA ALVES/.test(t2) && /BRUNA PEREIRA/.test(t2)]);
@@ -246,6 +262,11 @@ const okVend = clicar("Vendedores");
 await new Promise((r) => setTimeout(r, 600));
 const t3 = root.textContent || "";
 passos.push(["abriu a aba Vendedores", okVend]);
+{
+  const tv = root.textContent || "";
+  passos.push(["avisou sobre as duas bases de contagem",
+    /Duas bases de contagem/.test(tv) && /Jessica/.test(tv) && /Pedro/.test(tv)]);
+}
 passos.push(["trouxe o relatório para o fim da aba Vendedores", /Matrículas por vendedor · detalhe/.test(t3)]);
 passos.push(["agrupou pelo nome normalizado do vendedor",
   /Jessica Alves Torres/.test(t3) && /Bruna Pereira Benevides/.test(t3)]);

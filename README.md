@@ -156,6 +156,22 @@ Duas travas importantes, ambas motivadas por erros reais encontrados ao construi
 
 Quando não há base comparável, a frase é omitida em vez de inventar tendência.
 
+## Auditoria e qualidade do dado
+
+O painel foi auditado em 04/08/2026 (bateria em `supabase/migrations/20260804_auditoria_completa.sql`).
+Três mecanismos mantêm o gestor protegido de número silenciosamente errado:
+
+- **Pendências visíveis, nunca descarte mudo.** Matrícula sem data, com data
+  inválida (ano errado, data sem ano) ou sem Registro de Atendimento aparece
+  nomeada no bloco Consistência — com o valor digitado, para corrigir no Kommo.
+- **Duas bases, aviso explícito.** Enquanto o ranking da aba Vendedores contar
+  pela base antiga (que define faixa e comissão), um banner mostra a diferença
+  por vendedor contra o critério conferido. Unificar depende de decisão da
+  gestão, por alterar a base de comissionamento.
+- **Datas implausíveis não entram.** Pagamento no futuro (>7 dias) é rejeitado
+  na conversão e vira pendência; cartões criados retroativamente contam certo
+  e entram como jornada zero, com nota no insight.
+
 ## Cursos e estados (aba Origem, Canal & Região)
 
 Dois blocos alimentados pela RPC `dashboard_cursos(token, from, to)`.

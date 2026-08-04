@@ -1005,6 +1005,21 @@ function AbaVendedores({ data, schools, mat }) {
     { key: "dias_fechamento", label: "Fechamento (dias)", render: (r) => (r.dias_fechamento == null ? "—" : r.dias_fechamento.toFixed(1).replace(".", ",")) },
   ];
 
+  // Auditoria ago/2026: o ranking desta aba conta por fechamento + etapa atual
+  // (base que alimenta faixa e comissao). O relatorio nominal do fim da pagina
+  // conta pelo criterio conferido com a planilha (DATA PAGAMENTO + etapa).
+  // Quando divergem, o aviso abaixo mostra a diferenca por vendedor em vez de
+  // deixar dois numeros diferentes na mesma tela sem explicacao.
+  const canonPorVend = {};
+  ((mat && mat.por_vendedor) || []).forEach((v) => { canonPorVend[v.vendedor] = Number(v.matriculas || 0); });
+  const divergencias = nomes
+    .map((n) => {
+      const antiga = rowsHumanos.filter((r) => r.vendedor === n).reduce((a, r) => a + Number(r.matriculas || 0), 0);
+      const canon = canonPorVend[n];
+      return canon == null ? null : { vendedor: n, antiga, canon, dif: Math.round((antiga - canon) * 10) / 10 };
+    })
+    .filter((d) => d && Math.abs(d.dif) >= 0.5);
+
   // uma barra por vendedor, empilhada pelas escolas que ele atende
   const chartData = [...new Set(rows.filter((v) => v.matriculas > 0).map((v) => v.vendedor))]
     .map((nome) => {
@@ -1026,6 +1041,26 @@ function AbaVendedores({ data, schools, mat }) {
   } : null;
   return (
     <div style={{ display: "grid", gap: 14 }}>
+      {divergencias.length > 0 && (
+        <div style={{
+          padding: "11px 14px", borderRadius: 10, marginBottom: 2,
+          background: T.amber + T.tint, border: `1px solid ${T.amber}${T.tintForte}`,
+          borderLeft: `3px solid ${T.amber}`, fontSize: 11.5, lineHeight: 1.65,
+        }}>
+          <b>Duas bases de contagem nesta página.</b> O ranking abaixo conta pela data de
+          fechamento do card (base que define faixa e comissão); o relatório nominal, no fim
+          da página, conta pelo critério conferido com a planilha (DATA PAGAMENTO MATRÍCULA).
+          No período, divergem:{" "}
+          {divergencias.map((d, i) => (
+            <span key={d.vendedor}>
+              {i > 0 && " · "}
+              <b>{d.vendedor.split(" ")[0]}</b> {String(d.antiga).replace(".", ",")} → {String(d.canon).replace(".", ",")}
+            </span>
+          ))}
+          . Unificar o ranking no critério conferido altera a base de comissão — mudança que
+          depende de decisão da gestão.
+        </div>
+      )}
       {selKpi && <Panel title={`Visão do atendente — ${selVend}`}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
           <Kpi accent={T.ink} label="Leads atendidos" value={num(selKpi.leads)} />
@@ -3076,6 +3111,9 @@ function AbaMatriculas({ mat, schools }) {
           <Kpi label="Na etapa sem data de pagamento" value={num(diag.sem_data_pagamento)}
             accent={Number(diag.sem_data_pagamento) > 0 ? T.red : undefined}
             title="Leads em MATRÍCULA REALIZADA cujo campo DATA PAGAMENTO MATRICULA está vazio. Ficam FORA da contagem até serem preenchidos no Kommo." />
+          <Kpi label="Data de pagamento inválida" value={num(diag.data_invalida)}
+            accent={Number(diag.data_invalida) > 0 ? T.red : undefined}
+            title="Campo preenchido com valor que não converte em data (ano errado, data sem ano). A matrícula fica FORA da contagem até a correção no Kommo." />
         </div>
 
         {Number(diag.sem_data_pagamento) > 0 && (
@@ -3093,6 +3131,24 @@ function AbaMatriculas({ mat, schools }) {
                 {(mat.pendencias || []).length > 8 ? ` … e mais ${(mat.pendencias || []).length - 8}` : ""}
               </div>
             )}
+          </div>
+        )}
+
+        {(mat.pendencias_data || []).length > 0 && (
+          <div style={{
+            marginTop: 12, padding: "10px 13px", borderRadius: 8,
+            background: T.red + T.tint, border: `1px solid ${T.red}${T.tintForte}`,
+            fontSize: 11.5, lineHeight: 1.7,
+          }}>
+            <b>Data de pagamento que não converte</b> — corrigir o valor no cartão do contato no Kommo:
+            <div style={{ marginTop: 5 }}>
+              {(mat.pendencias_data || []).map((p) => (
+                <div key={p.id}>
+                  {p.name} <span style={{ color: T.muted }}>({(SCHOOLS[p.school] || {}).label || p.school})</span>
+                  {" — digitado: "}<b>"{p.valor}"</b>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

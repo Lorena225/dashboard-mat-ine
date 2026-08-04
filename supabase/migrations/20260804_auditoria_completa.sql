@@ -1,0 +1,49 @@
+-- ═══════════════════════════════════════════════════════════════════
+-- AUDITORIA COMPLETA — 04/08/2026
+--
+-- Bateria executada:
+--   1. Consistência interna de dashboard_matriculas: 8/8 recortes fecham
+--      (por_escola = por_atendente = por_vendedor = por_curso = lista = 124;
+--      faturamento 262.208 em todos).
+--   2. Aba Vendedores (base antiga) x critério canônico: diverge em
+--      Jessica (47x49), Bruna (30x32) e Pedro (10x6). A base antiga alimenta
+--      faixa e comissão — divergência agora VISÍVEL em banner na própria aba;
+--      unificação aguarda decisão da gestão por tocar comissionamento.
+--   3. Mídia: 0 duplicatas, 0 gastos negativos, 0 datas futuras,
+--      0 cliques>impressões, 0 escolas inválidas.
+--   4. Leads: 20 matrículas com pagamento ANTERIOR à criação do card
+--      (turmas registradas retroativamente — contagem correta, jornada
+--      corrigida); 2 datas de pagamento em 2027 (ano digitado errado).
+--   5. As 15 RPCs do painel respondem.
+--
+-- Correções aplicadas:
+--
+-- (1) parse_data_pagamento: rejeita datas > current_date+7 (pagamento não
+--     acontece no futuro; "08/06/2027" e "12/06/2027" iriam parar
+--     silenciosamente em jun/2027). IMMUTABLE→STABLE para poder consultar
+--     current_date — permitido em trigger. Reparse do histórico executado;
+--     meses fechados não mudaram (jul 124, jun 93).
+--
+-- (2) insights_jornada: duração negativa (cartão retroativo) vira zero.
+--     A média do Ineprotec estava 4,2 dias; a real é 8,6 — os negativos
+--     cortavam o número pela metade. Nota sobre retroativos incluída na frase.
+--
+-- (3) dashboard_matriculas: novo bloco pendencias_data (campo preenchido que
+--     não converte em data) + diagnostico.data_invalida. Antes esses casos
+--     eram invisíveis: não contavam e ninguém sabia. 4 casos atuais:
+--     VALDIR (12/06/2027), CRISTIANE (08/06/2027), RODRIGO (15/05 sem ano),
+--     CAROLINE (04/05/20226).
+--
+-- (4) insights_pipeline: caía com "field name must not be null" quando um
+--     lead recém-sincronizado chegava sem school derivada — derrubava a RPC
+--     dashboard_insights inteira (todos os tooltips). Escola passa a ser
+--     derivada do FUNIL, mesma regra canônica da contagem. Bug flagrado VIVO
+--     durante a auditoria.
+--
+-- Frontend:
+--   - Aba Vendedores: banner "Duas bases de contagem" com os deltas por
+--     vendedor quando o ranking diverge do critério conferido.
+--   - Consistência do período: KPI "Data de pagamento inválida" + lista dos
+--     casos com o valor digitado, para correção direta no Kommo.
+-- ═══════════════════════════════════════════════════════════════════
+-- (corpos completos aplicados no banco: migrations auditoria_*)
