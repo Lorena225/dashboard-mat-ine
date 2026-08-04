@@ -2243,7 +2243,140 @@ function AbaPipeline({ pipe, schools, insg }) {
 }
 
 // ═══════════════ MENU 2: MARKETING ═══════════════
-function MenuMarketing({ mkt, qual, orig, schools, insg }) {
+// ─────────────────────────────────────────────────────────────
+// Resumo de marketing em linguagem de dono. Existe porque o menu
+// Marketing foi desenhado para quem trabalha com mídia: CPL, ROAS,
+// pacing, atribuição. Quem manda na empresa quer responder três
+// perguntas — quanto gastei, o que isso virou, e bateu a meta.
+// Este bloco responde as três antes de qualquer jargão aparecer.
+// ─────────────────────────────────────────────────────────────
+// Separador de seção: o menu Marketing serve três leitores diferentes e
+// misturava tudo numa lista de 13 painéis. Cada seção declara para quem é.
+function SecaoPara({ titulo, para }) {
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ height: 1, flex: "0 0 18px", background: T.border }} />
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".09em",
+                      textTransform: "uppercase", color: T.muted, whiteSpace: "nowrap" }}>{titulo}</div>
+        <div style={{ height: 1, flex: 1, background: T.border }} />
+      </div>
+      <div style={{ fontSize: 11.5, color: T.muted, marginTop: 5, lineHeight: 1.6 }}>{para}</div>
+    </div>
+  );
+}
+
+function ResumoMarketing({ resumo, schools }) {
+  const linhas = ((resumo && resumo.por_escola) || []).filter((r) => schools.includes(r.school));
+  if (!linhas.length) return null;
+
+  const Selo = ({ ok, children }) => (
+    <span style={{
+      display: "inline-block", padding: "1px 8px", borderRadius: 999, fontSize: 10.5,
+      fontWeight: 600, whiteSpace: "nowrap",
+      background: (ok ? T.green : T.amber) + T.tint,
+      color: ok ? T.green : T.amber,
+      border: `1px solid ${(ok ? T.green : T.amber)}${T.tintForte}`,
+    }}>{children}</span>
+  );
+
+  const Linha = ({ rotulo, valor, apoio, selo }) => (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline",
+                  gap: 10, padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
+      <div style={{ fontSize: 12, color: T.muted, flexShrink: 0 }}>{rotulo}</div>
+      <div style={{ textAlign: "right", minWidth: 0 }}>
+        <div style={{ fontSize: 14.5, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+          {valor} {selo}
+        </div>
+        {apoio && <div style={{ fontSize: 10.5, color: T.muted, marginTop: 1 }}>{apoio}</div>}
+      </div>
+    </div>
+  );
+
+  return (
+    <Panel title={<>O essencial do período <Info texto="Escrito para leitura rápida da direção: quanto foi investido, o que isso virou em matrícula e receita, e como ficou contra a meta do mês. Os blocos seguintes abrem o detalhe para quem cuida de comercial e de mídia." /></>}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(310px,1fr))", gap: 16 }}>
+        {linhas.map((r) => {
+          const esc = SCHOOLS[r.school] || {};
+          const inv = Number(r.investimento || 0);
+          const orc = r.orcamento == null ? null : Number(r.orcamento);
+          const mat = Number(r.matriculas || 0);
+          const metaMat = r.meta_matriculas == null ? null : Number(r.meta_matriculas);
+          const rec = Number(r.receita || 0);
+          const metaRec = r.meta_receita == null ? null : Number(r.meta_receita);
+          const pctOrc = orc > 0 ? (100 * inv) / orc : null;
+          const pctMat = metaMat > 0 ? (100 * mat) / metaMat : null;
+          const pctRec = metaRec > 0 ? (100 * rec) / metaRec : null;
+
+          // a frase de fechamento troca conforme o cruzamento meta x gasto
+          const bateuMeta = pctMat != null && pctMat >= 100;
+          const estourou = pctOrc != null && pctOrc > 105;
+          const veredito = pctMat == null || pctOrc == null ? null
+            : bateuMeta && !estourou
+              ? "Bateu a meta dentro do orçamento."
+              : bateuMeta && estourou
+                ? "Bateu a meta, mas gastando acima do previsto — o resultado veio, o planejamento de verba é que ficou defasado."
+                : !bateuMeta && estourou
+                  ? "Gastou acima do previsto e ficou abaixo da meta. É a combinação que pede revisão antes de liberar mais verba."
+                  : "Ficou abaixo da meta, mas também gastou menos que o previsto.";
+
+          return (
+            <div key={r.school} style={{
+              border: `1px solid ${T.border}`, borderTop: `3px solid ${esc.color}`,
+              borderRadius: 10, padding: "14px 16px", background: T.panel,
+            }}>
+              <div style={{ marginBottom: 8 }}><SchoolTag school={r.school} /></div>
+
+              <Linha rotulo="Investimos" valor={brl(inv)}
+                apoio={orc != null ? `orçamento do mês ${brl(orc)}` : "sem orçamento definido"}
+                selo={pctOrc == null ? null : <Selo ok={pctOrc <= 105}>{pctOrc > 105 ? `${Math.round(pctOrc - 100)}% acima` : `${Math.round(pctOrc)}% do previsto`}</Selo>} />
+
+              <Linha rotulo="Chegaram" valor={`${num(r.leads)} interessados`}
+                apoio={r.meta_leads ? `meta do mês ${num(r.meta_leads)}` : null} />
+
+              <Linha rotulo="Viraram" valor={`${dec1(mat)} matrículas`}
+                apoio={metaMat != null ? `meta do mês ${num(metaMat)}` : null}
+                selo={pctMat == null ? null : <Selo ok={pctMat >= 100}>{`${Math.round(pctMat)}% da meta`}</Selo>} />
+
+              <Linha rotulo="Receita contratada" valor={brl(rec)}
+                apoio={metaRec != null ? `meta do mês ${brl(metaRec)}` : null}
+                selo={pctRec == null ? null : <Selo ok={pctRec >= 100}>{`${Math.round(pctRec)}% da meta`}</Selo>} />
+
+              <Linha rotulo="Cada matrícula custou"
+                valor={r.custo_por_matricula != null ? brl(r.custo_por_matricula) : "—"}
+                apoio="investimento em anúncios ÷ matrículas do período" />
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline",
+                            gap: 10, padding: "7px 0" }}>
+                <div style={{ fontSize: 12, color: T.muted }}>Cada R$ 1 investido virou</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: esc.color, fontVariantNumeric: "tabular-nums" }}>
+                  {r.retorno_por_real != null ? brl(r.retorno_por_real) : "—"}
+                </div>
+              </div>
+
+              {veredito && (
+                <div style={{
+                  marginTop: 8, padding: "8px 11px", borderRadius: 8, fontSize: 11.5, lineHeight: 1.6,
+                  background: (bateuMeta ? T.green : T.amber) + T.tint,
+                  border: `1px solid ${(bateuMeta ? T.green : T.amber)}${T.tintForte}`,
+                }}>{veredito}</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ fontSize: 11, color: T.muted, marginTop: 12, lineHeight: 1.6 }}>
+        <b>Matrículas</b> pelo critério conferido com a planilha (etapa + data de pagamento), o mesmo
+        da aba Matrículas & Auditoria. <b>Investimento</b> pelas contas de anúncio, não pela origem do
+        lead. Nem toda matrícula vem de anúncio — o custo por matrícula é do mês inteiro dividido pelo
+        investimento do mês, que é como se acompanha eficiência de verba, não atribuição individual.
+      </div>
+    </Panel>
+  );
+}
+
+function MenuMarketing({ mkt, qual, orig, schools, insg, mres }) {
   const [canalSel, setCanalSel] = useState(null);
   const ins = (insg && insg.marketing) || {};
   const insEsc = ins.por_escola || {};
@@ -2264,13 +2397,14 @@ function MenuMarketing({ mkt, qual, orig, schools, insg }) {
     const c = SCHOOLS[school].color;
     return (
       <div key={school} style={{ marginBottom: 14 }}>
+      <ResumoMarketing resumo={mres} schools={schools} />
+
         <div style={{ marginBottom: 8 }}><SchoolTag school={school} /></div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(148px, 1fr))", gap: 10 }}>
           <Kpi accent={c} label="Investimento" title={juntar("Soma do gasto em Meta Ads e Google Ads no período, pelas APIs das plataformas.", insEsc[school])} value={brl(spend)} delta={deltaPct(spend, spendAnt)} invert />
-          <Kpi accent={c} label="Leads (mídia)" title={juntar("Leads que as próprias plataformas reportam como conversão. O Meta costuma reportar zero em campanhas de mensagem: nesses casos, use a contagem pela Origem do Kommo.", ins.rastreio)} value={num(leads)} delta={deltaPct(leads, leadsAnt)} />
-          <Kpi accent={c} label="CPL" title={juntar("Custo por lead: investimento do período dividido pelos leads reportados pelas plataformas de anúncio.", juntar(ins.comparativo || "", ins.atribuicao) || undefined)} value={cpl != null ? brl(cpl) : "—"} delta={cpl != null && cplAnt != null ? (cpl - cplAnt) / cplAnt : null} invert />
+          <Kpi accent={c} label="Leads reportados pela plataforma" title={juntar("Leads que as próprias plataformas reportam como conversão. O Meta costuma reportar zero em campanhas de mensagem: nesses casos, use a contagem pela Origem do Kommo.", ins.rastreio)} value={num(leads)} delta={deltaPct(leads, leadsAnt)} />
+          <Kpi accent={c} label="Custo por lead" title={juntar("Custo por lead: investimento do período dividido pelos leads reportados pelas plataformas de anúncio.", juntar(ins.comparativo || "", ins.atribuicao) || undefined)} value={cpl != null ? brl(cpl) : "—"} delta={cpl != null && cplAnt != null ? (cpl - cplAnt) / cplAnt : null} invert />
           <Kpi accent={c} label="Cliques" title="Cliques nos anúncios no período, somando Meta e Google." value={num(clicks)} />
-          <Kpi accent={c} label="CPQL / ROAS" title="Custo por lead qualificado e retorno sobre investimento. Dependem de amarrar cada matrícula à campanha exata; com o rastreio por Origem já em uso, ligam assim que os nomes das campanhas do anúncio forem padronizados iguais aos valores gravados na Origem." value="—" />
         </div>
       </div>
     );
@@ -2294,7 +2428,9 @@ function MenuMarketing({ mkt, qual, orig, schools, insg }) {
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <div>{schools.map(kpiRow)}</div>
-      <div style={{ fontSize: 11.5, color: T.muted, marginTop: -8 }}>CPQL e ROAS dependem da atribuição de campanha (UTM) na captação — ativam junto com o Bloco Funil abaixo.</div>
+
+      <SecaoPara titulo="Detalhe da mídia paga"
+        para="Para quem cuida das campanhas: onde a verba está indo, quanto custa cada lead e quais campanhas fogem da média." />
 
       <Panel title="Distribuição de investimento — Meta × Google">
         <div style={{ width: "100%", height: 200 }}>
@@ -2370,18 +2506,6 @@ function MenuMarketing({ mkt, qual, orig, schools, insg }) {
       </Panel>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 14 }}>
-        <Panel title="Qualidade & Diagnóstico">
-          {alertas.length ? (
-            <div style={{ marginBottom: 12 }}>
-              {alertas.map((a, i) => (
-                <div key={i} style={{ border: `1px solid ${T.red}44`, background: T.red + "0d", borderRadius: 8, padding: "9px 12px", fontSize: 12.5, marginBottom: 6 }}>
-                  ⚠ <b>{a.campaign_name}</b> ({SCHOOLS[a.school].label}) — CPL {brl(a.cpl)}, {Math.round((a.cpl / cplMedio - 1) * 100)}% acima da média ({brl(cplMedio)})
-                </div>
-              ))}
-            </div>
-          ) : <div style={{ fontSize: 12.5, color: T.green, marginBottom: 12 }}>✓ Nenhuma campanha com CPL 40% acima da média no período</div>}
-          <Placeholder label="Diagnósticos de relevância (Meta) e Quality Score (Google)" detail="Rankings categóricos do Meta (Acima/Média/Abaixo — nunca somados) e % de termos com Quality Score < 5 no Google (nunca média geral) entram quando a sincronização desses campos for ativada nas APIs." />
-        </Panel>
 
         <Panel title="Metas & Pacing">
           {budgets.length ? (
@@ -2402,6 +2526,9 @@ function MenuMarketing({ mkt, qual, orig, schools, insg }) {
           )}
         </Panel>
       </div>
+
+      <SecaoPara titulo="De onde vem o resultado"
+        para="Para quem cuida do comercial: por onde os leads entram, quais origens realmente viram matrícula e onde o funil perde gente entre a mídia e a venda." />
 
       <Panel title="Leads e investimento por campanha (origem Kommo × plataformas)">
         {(() => {
@@ -2442,7 +2569,7 @@ function MenuMarketing({ mkt, qual, orig, schools, insg }) {
           pageSize={6}
         />
         <div style={{ fontSize: 11.5, color: T.muted, marginTop: 8, lineHeight: 1.5 }}>
-          Quase todos os leads aparecem como "organico" porque as UTMs não estão sendo gravadas na captação (só 0,1% têm utm preenchida, e o macro do Meta está literal). Corrigindo os parâmetros de URL nos anúncios + gravação no Kwid, este funil passa a atribuir lead pago → matrícula por campanha, e o CPQL/ROAS do topo ligam automaticamente.
+          Quase todos os leads aparecem como "organico" porque as UTMs não estão sendo gravadas na captação (só 0,1% têm utm preenchida, e o macro do Meta está literal). Corrigindo os parâmetros de URL nos anúncios e a gravação no Kwid, este funil passa a ligar cada lead pago à campanha que o trouxe — hoje isso só é possível no nível do canal, não da campanha.
         </div>
       </Panel>
 
@@ -3447,6 +3574,7 @@ export default function DashboardEdilvo() {
   const [mat, setMat] = useState(null);
   const [insg, setInsg] = useState(null);
   const [crs, setCrs] = useState(null);
+  const [mres, setMres] = useState(null);
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [applied, setApplied] = useState(null);
@@ -3508,9 +3636,10 @@ export default function DashboardEdilvo() {
       rpc("dashboard_matriculas", { p_token: RPC_TOKEN, p_from: from, p_to: to, p_school: null }),
       rpc("dashboard_insights", { p_token: RPC_TOKEN, p_from: from, p_to: to }),
       rpc("dashboard_cursos", { p_token: RPC_TOKEN, p_from: from, p_to: to }),
+      rpc("dashboard_marketing_resumo", { p_token: RPC_TOKEN, p_from: from, p_to: to }),
     ])
-      .then(([j, m, x, w, s, jo, q, fl, rg, od, pp, mt, isg, cr]) => {
-        setQual(q); setFila(fl); setReg(rg); setOrig(od); setPipe(pp); setMat(mt); setInsg(isg); setCrs(cr);
+      .then(([j, m, x, w, s, jo, q, fl, rg, od, pp, mt, isg, cr, mr]) => {
+        setQual(q); setFila(fl); setReg(rg); setOrig(od); setPipe(pp); setMat(mt); setInsg(isg); setCrs(cr); setMres(mr);
         if (w) { j = { ...j, vendedores: w.vendedores, cursos: w.cursos, faixas: w.faixas, vendedores_coorte: w.vendedores_coorte }; }
         setData(j); setMkt(m); setExtra(x); setSdr(s); setJor(jo); setLoading(false);
       })
@@ -3646,7 +3775,7 @@ export default function DashboardEdilvo() {
                     {aba === "jornada" && <AbaJornada jor={jor} schools={schools} insg={insg} />}
                   </>
                 )}
-                {menu === "marketing" && <MenuMarketing mkt={mkt} qual={qual} orig={orig} schools={schools} insg={insg} />}
+                {menu === "marketing" && <MenuMarketing mkt={mkt} qual={qual} orig={orig} schools={schools} insg={insg} mres={mres} />}
                 {menu === "home" && <MenuHome data={data} mkt={mkt} extra={extra} qual={qual} schools={schools} goTo={setMenu} />}
               </>
             )}

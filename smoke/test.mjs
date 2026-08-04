@@ -103,6 +103,18 @@ w.fetch = async (url) => ({
   status: 200,
   json: async () => {
     if (String(url).includes("dashboard_matriculas")) return MAT;
+    if (String(url).includes("dashboard_marketing_resumo")) return {
+      por_escola: [
+        { school: "ineprotec", investimento: 4614.35, orcamento: 2500, leads: 626,
+          matriculas: 79, receita: 167993, meta_leads: 450, meta_matriculas: 45,
+          meta_receita: 115000, custo_por_lead: 7.37, custo_por_matricula: 58.41,
+          retorno_por_real: 36.41, conversao: 12.6 },
+        { school: "matricula_ead", investimento: 8945.2, orcamento: 6000, leads: 819,
+          matriculas: 45, receita: 94215, meta_leads: 700, meta_matriculas: 55,
+          meta_receita: 125000, custo_por_lead: 10.92, custo_por_matricula: 198.78,
+          retorno_por_real: 10.53, conversao: 5.5 },
+      ],
+    };
     if (String(url).includes("dashboard_cursos")) return {
       cursos: [
         { curso: "TECNICO EM ELETROTECNICA", escola: "ineprotec", procurado: 184, vendido: 11, conversao: 6.0, faturamento: 22903 },
@@ -331,7 +343,20 @@ passos.push(["trouxe insight de perdas no hover",
 const okMkt = clicar("Marketing");
 await new Promise((r) => setTimeout(r, 550));
 const tm = [...w.document.querySelectorAll("[title]")].map((e) => e.getAttribute("title") || "");
+const tm2 = root.textContent || "";
 passos.push(["abriu o menu Marketing", okMkt]);
+passos.push(["abriu o Marketing com o resumo para a direção",
+  /O essencial do período/.test(tm2) && /Cada R\$ 1 investido virou/.test(tm2)]);
+passos.push(["comparou investimento com o orçamento do mês",
+  /85% acima/.test(tm2) && /49% acima/.test(tm2)]);
+passos.push(["mostrou meta batida e meta perdida",
+  /176% da meta/.test(tm2) && /82% da meta/.test(tm2)]);
+passos.push(["deu o veredito em linguagem simples",
+  /pede revisão antes de liberar mais verba/.test(tm2)]);
+passos.push(["declarou para quem é cada seção",
+  /Detalhe da mídia paga/.test(tm2) && /De onde vem o resultado/.test(tm2)]);
+passos.push(["removeu os blocos vazios de jargão",
+  !/CPQL/.test(tm2) && !/Qualidade & Diagnóstico/.test(tm2)]);
 passos.push(["trouxe insight de investimento no hover",
   tm.some((t) => /Custo por matrícula R\$ 58,41/.test(t))]);
 passos.push(["alertou sobre o Meta sem conversões",
