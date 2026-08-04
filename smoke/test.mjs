@@ -39,10 +39,26 @@ const MAT = {
   ],
   diagnostico: { total_matriculas: 121.0, total_leads: 113, alunos_multi_curso: 8,
     matriculas_multi_curso: 16, sem_atendente: 1, compartilhadas: 0, sem_curso: 0,
-    sem_data_pagamento: 2, data_invalida: 1, sucesso_sem_data: 27 },
+    sem_data_pagamento: 2, data_invalida: 1, sucesso_sem_data: 27, sem_forma_pagamento: 5 },
   pendencias: [{ id: 1, name: "ALUNO SEM DATA A", school: "ineprotec" },
                { id: 2, name: "ALUNO SEM DATA B", school: "matricula_ead" }],
   pendencias_data: [{ id: 9, name: "ALUNA ANO ERRADO", school: "matricula_ead", valor: "08/06/2027" }],
+  pendencias_forma: [
+    { id: 21, name: "ARNALDO SANTOS SOUZA JUNIOR", school: "matricula_ead",
+      curso: "TECNICO EM AGRICULTURA", valor: 2804, atendente: "PEDRO HENRIQUE" },
+  ],
+  pendencias_registro: [
+    { id: 22, name: "LUIS HENRIQUE FONSECA", school: "ineprotec", curso: "TECNICO EM ELETROMECANICA" },
+  ],
+  por_curso: [
+    { curso: "TECNICO EM AGRIMENSURA", escola: "ineprotec", matriculas: 26, faturamento: 64637, ticket_medio: 2486 },
+    { curso: "ESP. TEC. EM GEORREFERENCIAMENTO", escola: "ineprotec", matriculas: 21, faturamento: 38000, ticket_medio: 1809 },
+  ],
+  por_forma: [
+    { forma: "BOLETO PARCELADO", escola: "ineprotec", matriculas: 32, faturamento: 85565, ticket_medio: 2674 },
+    { forma: "PIX", escola: "ineprotec", matriculas: 24, faturamento: 44441, ticket_medio: 1852 },
+    { forma: "(sem forma)", escola: "matricula_ead", matriculas: 5, faturamento: 10218, ticket_medio: 2044 },
+  ],
   insights: {
     concentracao: "Jessica Alves concentra 40% das matrículas; os dois primeiros somam 65%.",
     cross_sell: "8 de 116 alunos levaram mais de um curso (7%).",
@@ -233,6 +249,16 @@ passos.push(["trouxe insight por atendente no hover",
   titulos.some((t) => /Ticket 7% acima da média/.test(t))]);
 passos.push(["manteve a definição junto do insight",
   titulos.some((t) => /uma matrícula por curso/.test(t) && /concentra 40%/.test(t))]);
+passos.push(["trouxe o ranking de matrículas por curso",
+  /Matrículas por curso/.test(t2) && /TECNICO EM AGRIMENSURA/.test(t2)]);
+passos.push(["trouxe o faturamento por forma de pagamento",
+  /Faturamento por forma de pagamento/.test(t2) && /BOLETO PARCELADO/.test(t2)]);
+passos.push(["separou análise de auditoria",
+  /Auditoria e conferência/.test(t2)]);
+passos.push(["alertou matrícula sem forma de pagamento com nome",
+  /Sem forma de pagamento preenchida/.test(t2) && /ARNALDO SANTOS SOUZA JUNIOR/.test(t2)]);
+passos.push(["alertou matrícula sem Registro de Atendimento com nome",
+  /Sem Registro de Atendimento/.test(t2) && /LUIS HENRIQUE FONSECA/.test(t2)]);
 passos.push(["contou os cards do funil do aluno sem data",
   /No funil do aluno sem data/.test(t2) && /27/.test(t2)]);
 passos.push(["mostrou a pendência de data inválida com o valor digitado",

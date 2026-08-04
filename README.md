@@ -170,6 +170,33 @@ Duas travas importantes, ambas motivadas por erros reais encontrados ao construi
 
 Quando não há base comparável, a frase é omitida em vez de inventar tendência.
 
+## Aba Matrículas & Auditoria — duas seções
+
+A aba é dividida de propósito, porque mistura duas atividades diferentes:
+
+**Resultado do período** (análise) — KPIs por escola, matrículas por usuário, ranking
+por curso e faturamento por forma de pagamento.
+
+**Auditoria e conferência** — relatório nome a nome e o bloco de consistência, com os
+cadastros que precisam de correção no Kommo antes do fechamento.
+
+O separador entre as duas existe para que o gestor que quer o número não tropece na
+conferência, e para que quem está conferindo não confunda alerta com resultado.
+
+### Ranking por curso e forma de pagamento
+
+Ambos seguem o **critério canônico** (etapa + DATA PAGAMENTO), então somam exatamente
+o total da aba. O ranking por curso mostra o que foi *vendido*; o que foi *procurado*
+e não converteu está na aba Origem, Canal & Região — a comparação entre os dois é
+onde mora a decisão.
+
+> **Atenção a uma duplicidade conhecida:** a aba Financeiro & Produto tem um bloco de
+> mesmo nome que usa a base histórica daquela aba (fechamento do card + etapa atual),
+> incluindo cadastros sem data de pagamento. Em jul/2026 ela conta 150 matrículas com
+> 33 "(não informado)", contra 124 do critério conferido. Os dois blocos trazem nota
+> explicando a diferença; unificar depende da mesma decisão pendente sobre a base da
+> aba Vendedores.
+
 ## Auditoria e qualidade do dado
 
 O painel foi auditado em 04/08/2026 (bateria em `supabase/migrations/20260804_auditoria_completa.sql`).

@@ -296,12 +296,13 @@ function Delta({ value, invert = false }) {
   );
 }
 
-function Kpi({ label, value, delta, invert, accent, title }) {
+function Kpi({ label, value, delta, invert, accent, title, sub }) {
   return (
     <div style={{ background: accent && accent !== T.ink ? accent + T.tint : T.panel, border: `1px solid ${accent && accent !== T.ink ? accent + T.tintForte : T.border}`, borderTop: `3px solid ${accent || T.border}`, borderRadius: 10, padding: "13px 15px", minWidth: 0, boxShadow: T.shadow }}>
       <div title={title} style={{ fontSize: 10.5, letterSpacing: ".07em", textTransform: "uppercase", color: T.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", cursor: title ? "help" : "default" }}>{label}</div>
       <div style={{ fontSize: 25, fontWeight: 600, margin: "3px 0 2px", fontVariantNumeric: "tabular-nums", color: T.text }}>{value}</div>
       <Delta value={delta} invert={invert} />
+      {sub && <div style={{ fontSize: 10.5, color: T.muted, marginTop: 2, lineHeight: 1.4 }}>{sub}</div>}
     </div>
   );
 }
@@ -1659,7 +1660,7 @@ function AbaFinanceiro({ data, schools }) {
       </Panel>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 14 }}>
-        <Panel title="Faturamento por forma de pagamento">
+        <Panel title={<>Faturamento por forma de pagamento <Info texto="Este bloco usa a base histórica desta aba (fechamento do card + etapa atual), que inclui cadastros sem data de pagamento. Para o número conferido contra a planilha, use o bloco de mesmo nome na aba Matrículas & Auditoria — lá a contagem segue o critério canônico e os totais podem diferir." /></>}>
           {pagChart.length ? (
             <div style={{ width: "100%", height: 230 }}>
               <ResponsiveContainer>
@@ -2993,6 +2994,32 @@ function AbaMatriculas({ mat, schools }) {
   const moeda = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
   const dec = (v) => Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
+  const totalMat = Number(diag.total_matriculas || 0);
+  const totalFat = (mat.por_escola || []).reduce((a, e) => a + Number(e.faturamento || 0), 0);
+
+  const porCurso = (mat.por_curso || [])
+    .filter((c) => schools.includes(c.escola))
+    .map((c) => ({ ...c, part: totalMat > 0 ? (100 * Number(c.matriculas || 0)) / totalMat : 0 }));
+
+  const porForma = (mat.por_forma || []).filter((f) => schools.includes(f.escola));
+
+  // consolida as escolas para os cartoes do topo do bloco
+  const formasResumo = Object.values(
+    porForma.reduce((acc, f) => {
+      const k = f.forma;
+      acc[k] = acc[k] || { forma: k, matriculas: 0, faturamento: 0 };
+      acc[k].matriculas += Number(f.matriculas || 0);
+      acc[k].faturamento += Number(f.faturamento || 0);
+      return acc;
+    }, {})
+  )
+    .map((f) => ({
+      ...f,
+      ticket_medio: f.matriculas > 0 ? f.faturamento / f.matriculas : 0,
+      part: totalFat > 0 ? (100 * f.faturamento) / totalFat : 0,
+    }))
+    .sort((a, b) => b.faturamento - a.faturamento);
+
   // A quebra por escola vem aninhada em `escolas`; achatamos para a tabela poder ordenar.
   const porAtendente = (mat.por_atendente || []).map((r) => {
     const linha = { ...r };
@@ -3098,6 +3125,86 @@ function AbaMatriculas({ mat, schools }) {
         </div>
       </Panel>
 
+      {/* ── Ranking de matrículas por curso ── */}
+      <Panel title={<>Matrículas por curso <Info texto="Ranking do que foi efetivamente vendido no período. Aluno com mais de um curso gera uma linha por curso, por isso a soma bate com o total de matrículas. Para comparar com o que foi PROCURADO (demanda que não virou venda), veja a aba Origem, Canal & Região." /></>}>
+        <DataTable
+          rows={porCurso}
+          initialSort={{ key: "matriculas", dir: "desc" }}
+          pageSize={12}
+          columns={[
+            { key: "escola", label: "Escola", render: (r) => <SchoolTag school={r.escola} /> },
+            { key: "curso", label: "Curso", style: { whiteSpace: "normal", minWidth: 200 } },
+            { key: "matriculas", label: "Matrículas", style: { textAlign: "right" },
+              render: (r) => <b>{dec(r.matriculas)}</b> },
+            { key: "part", label: "% do total", style: { textAlign: "right" },
+              render: (r) => <span style={{ color: T.muted }}>{dec1(r.part)}%</span> },
+            { key: "faturamento", label: "Faturamento", style: { textAlign: "right" },
+              render: (r) => moeda(r.faturamento) },
+            { key: "ticket_medio", label: "Ticket médio", style: { textAlign: "right" },
+              render: (r) => moeda(r.ticket_medio) },
+          ]}
+        />
+        <div style={{ marginTop: 10, fontSize: 11, color: T.muted, lineHeight: 1.6 }}>
+          Ordenado por volume. Clique em <b>Faturamento</b> para ver quais cursos sustentam a receita —
+          nem sempre são os mesmos que lideram em quantidade.
+        </div>
+      </Panel>
+
+      {/* ── Faturamento por forma de pagamento ── */}
+      <Panel title={<>Faturamento por forma de pagamento <Info texto="Como o aluno pagou, pelo campo Forma de Pagamento do lead. O ticket médio por forma costuma revelar o efeito do parcelamento: formas parceladas sustentam tickets mais altos, à vista tendem a ticket menor com recebimento imediato." /></>}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 12, marginBottom: 14 }}>
+          {formasResumo.map((f) => (
+            <Kpi key={f.forma} label={f.forma} value={moeda(f.faturamento)}
+              accent={f.forma === "(sem forma)" ? T.amber : undefined}
+              sub={`${dec(f.matriculas)} matrícula(s) · ${dec1(f.part)}% da receita`}
+              title={f.forma === "(sem forma)"
+                ? "Matrículas contadas normalmente, mas sem a forma de pagamento preenchida no Kommo. Aparecem nomeadas nos alertas no fim da página."
+                : `Ticket médio de ${moeda(f.ticket_medio)} nesta forma.`} />
+          ))}
+        </div>
+        <DataTable
+          rows={porForma}
+          initialSort={{ key: "faturamento", dir: "desc" }}
+          pageSize={10}
+          columns={[
+            { key: "escola", label: "Escola", render: (r) => <SchoolTag school={r.escola} /> },
+            { key: "forma", label: "Forma de pagamento",
+              render: (r) => (
+                <span style={{ color: r.forma === "(sem forma)" ? T.amber : undefined,
+                               fontWeight: r.forma === "(sem forma)" ? 600 : 400 }}>
+                  {r.forma}
+                </span>
+              ) },
+            { key: "matriculas", label: "Matrículas", style: { textAlign: "right" },
+              render: (r) => dec(r.matriculas) },
+            { key: "faturamento", label: "Faturamento", style: { textAlign: "right" },
+              render: (r) => <b>{moeda(r.faturamento)}</b> },
+            { key: "ticket_medio", label: "Ticket médio", style: { textAlign: "right" },
+              render: (r) => moeda(r.ticket_medio) },
+          ]}
+        />
+      </Panel>
+
+      {/* ── daqui para baixo é conferência, não análise: separado de propósito ── */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 12, marginTop: 6,
+        paddingTop: 4,
+      }}>
+        <div style={{ height: 1, flex: "0 0 18px", background: T.border }} />
+        <div style={{
+          fontSize: 11, fontWeight: 700, letterSpacing: ".09em",
+          textTransform: "uppercase", color: T.muted, whiteSpace: "nowrap",
+        }}>
+          Auditoria e conferência
+        </div>
+        <div style={{ height: 1, flex: 1, background: T.border }} />
+      </div>
+      <div style={{ fontSize: 11.5, color: T.muted, marginTop: -6, lineHeight: 1.6 }}>
+        Os blocos acima mostram <b>o resultado</b> do período. Os de baixo servem para
+        <b> conferir a base</b> antes de fechar o mês: relatório nome a nome e os cadastros
+        que precisam de correção no Kommo.
+      </div>
+
       <RelatorioNominalMatriculas mat={mat} agruparPor="atendente" />
 
       {/* ── Pontos de atenção da base ── */}
@@ -3116,6 +3223,9 @@ function AbaMatriculas({ mat, schools }) {
           <Kpi label="Data de pagamento inválida" value={num(diag.data_invalida)}
             accent={Number(diag.data_invalida) > 0 ? T.red : undefined}
             title="Campo preenchido com valor que não converte em data (ano errado, data sem ano). A matrícula fica FORA da contagem até a correção no Kommo." />
+          <Kpi label="Sem forma de pagamento" value={num(diag.sem_forma_pagamento)}
+            accent={Number(diag.sem_forma_pagamento) > 0 ? T.amber : undefined}
+            title="Matrículas contadas normalmente, mas com o campo Forma de Pagamento vazio no Kommo. Não afetam o total nem o faturamento — afetam a leitura de como a receita entra. Aparecem nomeadas abaixo." />
           <Kpi label="No funil do aluno sem data" value={num(diag.sucesso_sem_data)}
             accent={Number(diag.sucesso_sem_data) > 0 ? T.amber : undefined}
             title="Cards fechados no período que estão no funil SUCESSO DO ALUNO sem data de pagamento. Ficam fora da contagem. A conferência com a planilha de julho indica que são atendimentos de alunos antigos, não matrículas perdidas — mas vale checar antes de fechar o mês: se algum for matrícula real, basta preencher a data no Kommo que ele entra." />
@@ -3157,10 +3267,42 @@ function AbaMatriculas({ mat, schools }) {
           </div>
         )}
 
-        {Number(diag.sem_atendente) > 0 && (
-          <div style={{ marginTop: 12, fontSize: 11.5, color: T.muted, lineHeight: 1.6 }}>
-            {num(diag.sem_atendente)} matrícula(s) estão sem Registro de Atendimento e aparecem no relatório
-            como <b>(sem registro de atendimento)</b>. Contam para a escola, mas não para nenhum vendedor.
+        {(mat.pendencias_forma || []).length > 0 && (
+          <div style={{
+            marginTop: 12, padding: "10px 13px", borderRadius: 8,
+            background: T.amber + T.tint, border: `1px solid ${T.amber}${T.tintForte}`,
+            fontSize: 11.5, lineHeight: 1.7,
+          }}>
+            <b>Sem forma de pagamento preenchida</b> — estas matrículas contam no total e no
+            faturamento, mas ficam fora da leitura de como a receita entrou. Preencher o campo
+            no lead resolve:
+            <div style={{ marginTop: 5 }}>
+              {(mat.pendencias_forma || []).map((p) => (
+                <div key={p.id}>
+                  {p.name} <span style={{ color: T.muted }}>({(SCHOOLS[p.school] || {}).label || p.school}</span>
+                  <span style={{ color: T.muted }}>{p.curso ? " · " + p.curso : ""} · {p.atendente})</span>
+                  {" — "}<b>{moeda(p.valor)}</b>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {(mat.pendencias_registro || []).length > 0 && (
+          <div style={{
+            marginTop: 12, padding: "10px 13px", borderRadius: 8,
+            background: T.amber + T.tint, border: `1px solid ${T.amber}${T.tintForte}`,
+            fontSize: 11.5, lineHeight: 1.7,
+          }}>
+            <b>Sem Registro de Atendimento</b> — contam para a escola, mas não são creditadas
+            a nenhum vendedor. Selecionar o atendente no campo do lead resolve:
+            <div style={{ marginTop: 5 }}>
+              {(mat.pendencias_registro || []).map((p) => (
+                <div key={p.id}>
+                  {p.name} <span style={{ color: T.muted }}>({(SCHOOLS[p.school] || {}).label || p.school}{p.curso ? " · " + p.curso : ""})</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </Panel>
