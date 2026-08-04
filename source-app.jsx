@@ -615,18 +615,18 @@ function AbaVisaoGeral({ data, extra, qual, fila, schools, insg }) {
           <Panel title="Fila automática — leads sem resposta (rastreamento)">
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 10, marginBottom: 4 }}>
               {per.map((f) => (
-                <Kpi key={f.school} accent={SCHOOLS[f.school].color} label={`Ca\u00edram na fila no per\u00edodo \u00b7 ${SCHOOLS[f.school].label}`} value={num(f.caiu_na_fila)} />
+                <Kpi key={f.school} accent={SCHOOLS[f.school].color} label={`Caíram na fila no período · ${SCHOOLS[f.school].label}`} value={num(f.caiu_na_fila)} />
               ))}
               {acu.map((f) => (
-                <Kpi key={f.school + "a"} label={`Fila acumulada (hist\u00f3rico) \u00b7 ${SCHOOLS[f.school].label}`} value={num(f.fila_acumulada)} />
+                <Kpi key={f.school + "a"} label={`Fila acumulada (histórico) · ${SCHOOLS[f.school].label}`} value={num(f.fila_acumulada)} />
               ))}
             </div>
             <div style={{ fontSize: 11.5, color: T.muted, margin: "6px 0 14px", lineHeight: 1.6 }}>
-              "Ca\u00edram na fila no per\u00edodo" respeita o filtro de data ativo (LEAD SEM RESPOSTA). Estes leads ficam fora de leads parados, das m\u00e9dias de convers\u00e3o e do ranking de vendedores \u2014 n\u00e3o s\u00e3o fracasso de convers\u00e3o, s\u00e3o contato n\u00e3o estabelecido. As tabelas abaixo s\u00e3o informativas, para achar gargalos por etapa e volume de carteira por vendedor.
+              Estes são os leads com quem <b>nunca se conseguiu falar</b>. Não entram nas taxas de conversão nem no ranking de vendedores, porque não houve atendimento para avaliar — ninguém perdeu a venda, o contato não chegou a acontecer. As tabelas abaixo servem para achar onde isso mais acontece.
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 14 }}>
               <div>
-                <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>De qual etapa a fila est\u00e1 vazando</div>
+                <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>De qual etapa a fila está vazando</div>
                 {etaChart.length ? (
                   <div style={{ width: "100%", height: Math.max(150, etaChart.length * 34 + 30) }}>
                     <ResponsiveContainer>
@@ -642,7 +642,7 @@ function AbaVisaoGeral({ data, extra, qual, fila, schools, insg }) {
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
-                ) : <Placeholder label="Nenhuma queda em fila no per\u00edodo" />}
+                ) : <Placeholder label="Nenhuma queda em fila no período" />}
               </div>
               <div>
                 <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>Volume de carteira por vendedor de origem</div>
@@ -656,7 +656,7 @@ function AbaVisaoGeral({ data, extra, qual, fila, schools, insg }) {
                   initialSort={{ key: "total", dir: "desc" }}
                   pageSize={6}
                 />
-                <div style={{ fontSize: 11, color: T.muted, marginTop: 6 }}>Informativo: de quem era o lead antes de cair na fila. Volume/qualidade de carteira, n\u00e3o convers\u00e3o.</div>
+                <div style={{ fontSize: 11, color: T.muted, marginTop: 6 }}>Mostra em qual carteira o lead estava quando o contato não foi estabelecido. Serve para ver volume por vendedor — não é medida de desempenho.</div>
               </div>
             </div>
           </Panel>
@@ -3328,7 +3328,7 @@ function RelatorioNominalMatriculas({ mat, agruparPor = "atendente" }) {
       .map((l) => l.map((c) => `"${String(c == null ? "" : c).replace(/"/g, '""')}"`).join(";"))
       .join("\r\n");
     const per = (mat.periodo || {}).from ? String(mat.periodo.from).slice(0, 10) : "periodo";
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = `matriculas_${per}.csv`;
@@ -4058,7 +4058,7 @@ export default function DashboardEdilvo() {
             <button onClick={() => setTema(tema === "claro" ? "escuro" : "claro")}
               title={tema === "claro" ? "Mudar para tema escuro" : "Mudar para tema claro"}
               style={{ background: T.panelSoft, color: T.text, border: `1px solid ${T.border}`, borderRadius: 20, padding: "5px 11px", fontSize: 11.5, cursor: "pointer", fontFamily: font, whiteSpace: "nowrap" }}>
-              {tema === "claro" ? "\u25D0 Escuro" : "\u25D1 Claro"}
+              {tema === "claro" ? "◐ Escuro" : "◑ Claro"}
             </button>
           </div>
         </aside>

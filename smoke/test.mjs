@@ -313,6 +313,9 @@ const clicar = (rotulo) => {
 
 const passos = [];
 passos.push(["montou o app", root.children.length > 0]);
+// regressao: escapes \u00xx literais chegaram a vazar crus na tela
+passos.push(["não vazou escape unicode no texto",
+  !/\\u00[0-9a-f]{2}/i.test(root.textContent || "")]);
 passos.push(["renderizou conteúdo", txt.length > 200]);
 
 const okComercial = clicar("Comercial");
