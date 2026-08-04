@@ -197,6 +197,32 @@ onde mora a decisão.
 > explicando a diferença; unificar depende da mesma decisão pendente sobre a base da
 > aba Vendedores.
 
+## Leitura estratégica — cobertura e regra de escrita
+
+Praticamente todo bloco do painel tem, no hover, uma leitura calculada sobre o
+período consultado. Cobertura atual: matrículas, vendedores, cursos vendidos,
+forma de pagamento, marketing, cada canal de mídia, orgânico, funil e perdas,
+pipeline, região, jornada e SDR.
+
+**A regra de escrita tem duas partes:**
+
+1. Toda frase carrega o número que a sustenta.
+2. Toda frase termina no que dá para **fazer** com aquele número.
+
+Não existe frase apenas elogiosa, e isso é deliberado: um insight sempre otimista
+vira propaganda e o dono para de confiar no painel. O que existe é leitura
+**construtiva** — número ruim vira a oportunidade que ele abre, número bom vira o
+próximo passo para não desperdiçá-lo.
+
+Exemplo do mesmo dado nas duas leituras possíveis:
+
+> ❌ "O Meta não registrou conversões." *(constata e para)*
+> ✅ "A plataforma não registrou conversões, então aqui só dá para avaliar alcance
+> e clique. Corrigir o pixel destravaria a otimização automática do Meta — é a
+> melhoria de maior retorno neste canal hoje, e não custa verba adicional."
+
+Quando não há base comparável, a frase é omitida em vez de inventar tendência.
+
 ## Indicador de atualização — três estados
 
 O chip no topo distingue:

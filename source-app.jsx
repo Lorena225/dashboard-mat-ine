@@ -2285,9 +2285,10 @@ function SecaoPara({ titulo, para }) {
 // cliques no site do lado do Facebook. Onde a plataforma não entrega,
 // mostramos "não fornecido" em vez de zero, que seria mentira.
 // ─────────────────────────────────────────────────────────────
-function BlocoOrganico({ social, schools }) {
+function BlocoOrganico({ social, schools, insg }) {
   const [rede, setRede] = useState("instagram");
   const dataBR = (v) => (v ? new Date(v).toLocaleDateString("pt-BR") : "—");
+  const insConta = ((insg && insg.social) || {}).por_conta || {};
   const resumo = ((social && social.resumo) || [])
     .filter((r) => schools.includes(r.school) && r.network === rede);
   const posts = ((social && social.posts) || [])
@@ -2329,7 +2330,7 @@ function BlocoOrganico({ social, schools }) {
               borderRadius: 10, padding: "14px 16px", background: T.panel,
             }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                <SchoolTag school={r.school} />
+                <TituloComLeitura texto={insConta[`${r.school}|${rede}`]}><SchoolTag school={r.school} /></TituloComLeitura>
                 {r.handle && <span style={{ fontSize: 11.5, color: T.muted }}>
                   {rede === "instagram" ? "@" : ""}{r.handle}
                 </span>}
@@ -2429,8 +2430,9 @@ function BlocoOrganico({ social, schools }) {
 //
 // Cada aba mostra so o que sua plataforma realmente fornece.
 // ═══════════════════════════════════════════════════════════════
-function AbaCanal({ dados, schools, canal }) {
+function AbaCanal({ dados, schools, canal, insg }) {
   const nome = canal === "google" ? "Google Ads" : "Meta Ads";
+  const leitura = ((insg && insg["canal_" + canal]) || {}).leitura || null;
   if (!dados) return <Placeholder label={`Carregando ${nome}…`} />;
 
   const porEscola = (dados.por_escola || []).filter((r) => schools.includes(r.school));
@@ -2477,7 +2479,7 @@ function AbaCanal({ dados, schools, canal }) {
       {porEscola.map((x) => {
         const esc = SCHOOLS[x.school] || {};
         return (
-          <Panel key={x.school} title={<span><SchoolTag school={x.school} /></span>}>
+          <Panel key={x.school} title={<TituloComLeitura texto={leitura}><SchoolTag school={x.school} /></TituloComLeitura>}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(155px,1fr))", gap: 12 }}>
               <Kpi accent={esc.color} label="Investimento" value={brl(x.gasto)}
                 sub={`${num(x.campanhas)} campanha(s) ativas`} />
@@ -3405,8 +3407,9 @@ function RelatorioNominalMatriculas({ mat, agruparPor = "atendente" }) {
 //   3. Escola: sempre a do lead (funil). Os atendentes atuam nas duas escolas, então
 //      o prefixo INE-/MAT- no nome do usuário é só parte do nome e não classifica nada —
 //      por isso o total de cada usuário vem aberto por escola.
-function AbaMatriculas({ mat, schools }) {
+function AbaMatriculas({ mat, schools, insg }) {
   const [metricaCurso, setMetricaCurso] = useState("matriculas");
+  const lerIns = (k) => ((insg && insg[k]) || {}).leitura || null;
   if (!mat) return <Placeholder label="Carregando matrículas…" />;
 
   const diag = mat.diagnostico || {};
@@ -3589,7 +3592,7 @@ function AbaMatriculas({ mat, schools }) {
       </Panel>
 
       {/* ── Ranking de matrículas por curso ── */}
-      <Panel title={<>Matrículas por curso <Info texto="Ranking do que foi efetivamente vendido no período. Aluno com mais de um curso gera uma linha por curso, por isso a soma bate com o total de matrículas. Para comparar com o que foi PROCURADO (demanda que não virou venda), veja a aba Origem, Canal & Região." /></>}>
+      <Panel title={<TituloComLeitura texto={lerIns("cursos_vendidos")}>Matrículas por curso <Info texto="Ranking do que foi efetivamente vendido no período. Aluno com mais de um curso gera uma linha por curso, por isso a soma bate com o total de matrículas. Para comparar com o que foi PROCURADO (demanda que não virou venda), veja a aba Origem, Canal & Região." /></TituloComLeitura>}>
         {/* alternador: a ordem por volume e por faturamento nao e a mesma */}
         <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
           {[["matriculas", "Por matrículas"], ["faturamento", "Por faturamento"]].map(([id, rot]) => (
@@ -3685,7 +3688,7 @@ function AbaMatriculas({ mat, schools }) {
       </Panel>
 
       {/* ── Faturamento por forma de pagamento ── */}
-      <Panel title={<>Faturamento por forma de pagamento <Info texto="Como o aluno pagou, pelo campo Forma de Pagamento do lead. O ticket médio por forma costuma revelar o efeito do parcelamento: formas parceladas sustentam tickets mais altos, à vista tendem a ticket menor com recebimento imediato." /></>}>
+      <Panel title={<TituloComLeitura texto={lerIns("pagamento")}>Faturamento por forma de pagamento <Info texto="Como o aluno pagou, pelo campo Forma de Pagamento do lead. O ticket médio por forma costuma revelar o efeito do parcelamento: formas parceladas sustentam tickets mais altos, à vista tendem a ticket menor com recebimento imediato." /></TituloComLeitura>}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 12, marginBottom: 14 }}>
           {formasResumo.map((f) => (
             <Kpi key={f.forma} label={f.forma} value={moeda(f.faturamento)}
@@ -4095,7 +4098,7 @@ export default function DashboardEdilvo() {
                     {aba === "pipeline" && <AbaPipeline pipe={pipe} schools={schools} insg={insg} />}
                     {aba === "funil" && <AbaFunilPerdas data={data} schools={schools} insg={insg} />}
                     {aba === "vendedores" && <AbaVendedores data={data} schools={schools} mat={mat} />}
-                    {aba === "matriculas" && <AbaMatriculas mat={mat} schools={schools} />}
+                    {aba === "matriculas" && <AbaMatriculas mat={mat} schools={schools} insg={insg} />}
                     {aba === "origem" && <AbaOrigem data={data} extra={extra} reg={reg} schools={schools} insg={insg} crs={crs} />}
                     {aba === "financeiro" && <AbaFinanceiro data={data} schools={schools} />}
                     {aba === "metas" && <AbaMetas data={data} periodoFrom={periodoAtualFrom} onSaved={() => setReload((r) => r + 1)} />}
@@ -4105,9 +4108,9 @@ export default function DashboardEdilvo() {
                 )}
                 {menu === "marketing" && <>
                     {abaMkt === "geral" && <MenuMarketing mkt={mkt} qual={qual} orig={orig} schools={schools} insg={insg} mres={mres} />}
-                    {abaMkt === "google" && <AbaCanal dados={canalGoogle} schools={schools} canal="google" />}
-                    {abaMkt === "meta" && <AbaCanal dados={canalMeta} schools={schools} canal="meta" />}
-                    {abaMkt === "organico" && <BlocoOrganico social={social} schools={schools} />}
+                    {abaMkt === "google" && <AbaCanal dados={canalGoogle} schools={schools} canal="google" insg={insg} />}
+                    {abaMkt === "meta" && <AbaCanal dados={canalMeta} schools={schools} canal="meta" insg={insg} />}
+                    {abaMkt === "organico" && <BlocoOrganico social={social} schools={schools} insg={insg} />}
                   </>}
                 {menu === "home" && <MenuHome data={data} mkt={mkt} extra={extra} qual={qual} schools={schools} goTo={setMenu} />}
               </>

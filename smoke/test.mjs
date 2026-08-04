@@ -190,6 +190,11 @@ w.fetch = async (url, opts) => ({
       jornada: { por_escola: {
         ineprotec: "Metade fecha em até 0 dia(s). Ciclo curto.",
         matricula_ead: "Metade fecha em até 2 dia(s)." } },
+      cursos_vendidos: { leitura: "20 cursos diferentes venderam no período. Carteira concentrada: o lado bom é que você já sabe onde investir." },
+      pagamento: { leitura: "Boleto Parcelado responde por 46,8% da receita. Oferecer a forma de maior ticket como primeira opção." },
+      canal_google: { leitura: "R$ 9.528 investidos. A plataforma registrou 425 conversões, a R$ 22,42 cada." },
+      canal_meta: { leitura: "Corrigir o pixel destravaria a otimização automática do Meta." },
+      social: { por_conta: { "ineprotec|instagram": "27.463 pessoas alcançadas com 8 publicação(ões), sem nenhum custo de mídia." } },
       sdr: { cobertura: "O agente recebeu 6 leads dos 1.445 gerados no período (0,4%)." },
       funil: {
         por_escola: { matricula_ead: "179 perdas no período. O motivo mais frequente é CURSO NAO ENCONTRADO." },
@@ -332,6 +337,13 @@ passos.push(["montou o bloco do gráfico de cursos",
   /Top 10 cursos/.test(t2) && /empilhadas por escola/.test(t2)]);
 passos.push(["ofereceu alternar entre volume e faturamento",
   /Por matrículas/.test(t2) && /Por faturamento/.test(t2)]);
+{
+  const tc = [...w.document.querySelectorAll("[title]")].map((e) => e.getAttribute("title") || "");
+  passos.push(["leu a concentração da carteira de cursos",
+    tc.some((t) => /Carteira concentrada/.test(t))]);
+  passos.push(["apontou a alavanca de ticket na forma de pagamento",
+    tc.some((t) => /forma de maior ticket como primeira opção/.test(t))]);
+}
 passos.push(["trouxe o ranking de matrículas por curso",
   /Matrículas por curso/.test(t2) && /TECNICO EM AGRIMENSURA/.test(t2)]);
 passos.push(["trouxe o faturamento por forma de pagamento",
@@ -404,6 +416,9 @@ passos.push(["abriu o menu Marketing", okMkt]);
   await new Promise((r) => setTimeout(r, 450));
   const tg = root.textContent || "";
   passos.push(["abriu a aba Google Ads", abaG]);
+  const tgT = [...w.document.querySelectorAll("[title]")].map((e) => e.getAttribute("title") || "");
+  passos.push(["leu o canal Google com ressalva sobre conversão",
+    tgT.some((t) => /425 conversões/.test(t))]);
   passos.push(["mostrou conversões só no Google",
     /Conversões/.test(tg) && /Custo por conversão/.test(tg) && !/Pessoas alcançadas/.test(tg)]);
 
@@ -413,6 +428,9 @@ passos.push(["abriu o menu Marketing", okMkt]);
   passos.push(["abriu a aba Meta Ads", abaM]);
   passos.push(["mostrou alcance e frequência só no Meta",
     /Pessoas alcançadas/.test(tmeta) && /1,2x em média|1,17/.test(tmeta)]);
+  const tmT = [...w.document.querySelectorAll("[title]")].map((e) => e.getAttribute("title") || "");
+  passos.push(["apontou o pixel como oportunidade no Meta",
+    tmT.some((t) => /destravaria a otimização automática/.test(t))]);
   passos.push(["alertou sobre o Meta sem conversões na aba própria",
     /não registrou nenhuma conversão/.test(tmeta)]);
 
@@ -423,6 +441,9 @@ passos.push(["abriu o menu Marketing", okMkt]);
   passos.push(["trouxe seguidores e perfil no orgânico",
     /6.633/.test(torg) && /ineprotec/.test(torg)]);
   passos.push(["mostrou ritmo de publicação", /1,8 publicações por semana/.test(torg)]);
+  const torgT = [...w.document.querySelectorAll("[title]")].map((e) => e.getAttribute("title") || "");
+  passos.push(["leu o orgânico como audiência sem custo",
+    torgT.some((t) => /sem nenhum custo de mídia/.test(t))]);
   passos.push(["listou as publicações que mais engajaram",
     /Publicações que mais engajaram/.test(torg) && /Escolher uma instituição/.test(torg)]);
 
