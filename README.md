@@ -204,6 +204,13 @@ período consultado. Cobertura atual: matrículas, vendedores, cursos vendidos,
 forma de pagamento, marketing, cada canal de mídia, orgânico, funil e perdas,
 pipeline, região, jornada e SDR.
 
+Cobertura por menu: **Comercial** — Visão Geral, Vendedores, Matrículas & Auditoria
+(incluindo cursos e forma de pagamento), Origem, Jornada, Pipeline, Funil, SDR e
+Financeiro. **Marketing** — Visão Geral, Google Ads, Meta Ads e Redes Orgânicas.
+
+**Metas & Comissões segue deliberadamente sem leitura:** qualquer frase ali toca
+em base de pagamento e precisa de validação da gestão antes de existir.
+
 **A regra de escrita tem duas partes:**
 
 1. Toda frase carrega o número que a sustenta.

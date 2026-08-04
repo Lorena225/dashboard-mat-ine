@@ -419,7 +419,13 @@ const pgBtn = (off) => ({ background: T.panelSoft, color: off ? T.muted : T.text
 // ═══════════════════════════════════════════════════════════════════
 
 // ── Aba 1: Visão Geral Comercial ──
-function AbaVisaoGeral({ data, extra, qual, fila, schools }) {
+function AbaVisaoGeral({ data, extra, qual, fila, schools, insg }) {
+  const insVG = (insg && insg.visao_geral) || {};
+  const leituraVG = schools
+    .map((e) => ((insVG.por_escola || {})[e] ? `${(SCHOOLS[e] || {}).label || e}: ${insVG.por_escola[e]}` : null))
+    .filter(Boolean)
+    .concat(insVG.comparativo ? [insVG.comparativo] : [])
+    .join("\n\n") || null;
   const [modoFunil, setModoFunil] = useState("atual");
   const vg = data.visao_geral, fe = data.fechamentos, fea = data.fechamentos_ant, va = data.visao_ant;
   const kpiRow = (school) => {
@@ -447,7 +453,11 @@ function AbaVisaoGeral({ data, extra, qual, fila, schools }) {
           <Kpi accent={c} label="Conversão de leads" value={pct(convLeads)} delta={convLeads != null && convLeadsAnt != null ? convLeads - convLeadsAnt : null}
             title="Dos leads que ENTRARAM no período, quantos já viraram matrícula. É a taxa comercial no sentido comum — tende a ser baixa porque parte dos leads ainda está em negociação e vai converter depois." />
           <Kpi accent={c} label="Aproveitamento (decididos)" value={pct(conv)} delta={conv != null && convAnt != null ? conv - convAnt : null}
-            title="Entre os leads DECIDIDOS no período (matrículas + perdas fechadas), quantos viraram matrícula. Ignora quem ainda está em aberto, por isso é sempre maior que a conversão de leads. Serve para medir a qualidade do fechamento, não o volume de entrada." />
+            title={[
+              "Entre os leads DECIDIDOS no período (matrículas + perdas fechadas), quantos viraram matrícula. Ignora quem ainda está em aberto, por isso é sempre maior que a conversão de leads. Serve para medir a qualidade do fechamento, não o volume de entrada.",
+              ((insVG.por_escola || {})[school] || null),
+              insVG.comparativo || null,
+            ].filter(Boolean).join("\n\n")} />
           <Kpi accent={c} label="Faturamento" value={brl(f.faturamento)} delta={deltaPct(f.faturamento, fa.faturamento)}
             title="Soma do valor das matrículas fechadas no período, conforme o campo de valor do lead no Kommo." />
           <Kpi accent={c} label="Ticket médio" value={brl(f.ticket_medio)}
@@ -975,7 +985,8 @@ function AbaFunilPerdas({ data, schools, insg }) {
 }
 
 // ── Aba 3: Performance por Vendedor ──
-function AbaVendedores({ data, schools, mat }) {
+function AbaVendedores({ data, schools, mat, insg }) {
+  const leituraVend = ((insg && insg.vendedores) || {}).leitura || null;
   const [selVend, setSelVend] = useState("todos");
   const [indicador, setIndicador] = useState("todos");
   const [visao, setVisao] = useState("producao");
@@ -1074,7 +1085,7 @@ function AbaVendedores({ data, schools, mat }) {
           <Kpi accent={T.ink} label="Tempo médio (dias)" value={selKpi.dias != null ? selKpi.dias.toFixed(1).replace(".", ",") : "—"} />
         </div>
       </Panel>}
-      <Panel title="Matrículas por vendedor (período)">
+      <Panel title={<TituloComLeitura texto={leituraVend}>Matrículas por vendedor (período)</TituloComLeitura>}>
         {chartData.length ? (
           <div style={{ width: "100%", height: Math.max(160, chartData.length * 42 + 40) }}>
             <ResponsiveContainer>
@@ -1608,7 +1619,8 @@ function AbaOrigem({ data, extra, reg, schools, insg, crs }) {
 }
 
 // ── Aba 5: Financeiro & Produto ──
-function AbaFinanceiro({ data, schools }) {
+function AbaFinanceiro({ data, schools, insg }) {
+  const leituraFin = ((insg && insg.financeiro) || {}).leitura || null;
   const cursosRows = data.cursos.filter((c) => schools.includes(c.school));
   const pagRows = data.pagamentos.filter((p) => schools.includes(p.school));
 
@@ -1625,7 +1637,7 @@ function AbaFinanceiro({ data, schools }) {
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
-      <Panel title="Faturamento por curso (top 8)">
+      <Panel title={<TituloComLeitura texto={leituraFin}>Faturamento por curso (top 8)</TituloComLeitura>}>
         {topCursos.length ? (
           <div style={{ width: "100%", height: Math.max(180, topCursos.length * 40 + 40) }}>
             <ResponsiveContainer>
@@ -4094,13 +4106,13 @@ export default function DashboardEdilvo() {
               <>
                 {menu === "comercial" && (
                   <>
-                    {aba === "visao" && <AbaVisaoGeral data={data} extra={extra} qual={qual} fila={fila} schools={schools} />}
+                    {aba === "visao" && <AbaVisaoGeral data={data} extra={extra} qual={qual} fila={fila} schools={schools} insg={insg} />}
                     {aba === "pipeline" && <AbaPipeline pipe={pipe} schools={schools} insg={insg} />}
                     {aba === "funil" && <AbaFunilPerdas data={data} schools={schools} insg={insg} />}
-                    {aba === "vendedores" && <AbaVendedores data={data} schools={schools} mat={mat} />}
+                    {aba === "vendedores" && <AbaVendedores data={data} schools={schools} mat={mat} insg={insg} />}
                     {aba === "matriculas" && <AbaMatriculas mat={mat} schools={schools} insg={insg} />}
                     {aba === "origem" && <AbaOrigem data={data} extra={extra} reg={reg} schools={schools} insg={insg} crs={crs} />}
-                    {aba === "financeiro" && <AbaFinanceiro data={data} schools={schools} />}
+                    {aba === "financeiro" && <AbaFinanceiro data={data} schools={schools} insg={insg} />}
                     {aba === "metas" && <AbaMetas data={data} periodoFrom={periodoAtualFrom} onSaved={() => setReload((r) => r + 1)} />}
                     {aba === "sdr" && <AbaSDR sdr={sdr} schools={schools} insg={insg} />}
                     {aba === "jornada" && <AbaJornada jor={jor} schools={schools} insg={insg} />}

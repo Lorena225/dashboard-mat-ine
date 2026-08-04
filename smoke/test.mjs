@@ -190,6 +190,12 @@ w.fetch = async (url, opts) => ({
       jornada: { por_escola: {
         ineprotec: "Metade fecha em até 0 dia(s). Ciclo curto.",
         matricula_ead: "Metade fecha em até 2 dia(s)." } },
+      visao_geral: {
+        por_escola: { ineprotec: "De 626 leads entrados, 79 viraram matrícula. Entre os que DECIDIRAM, o aproveitamento é de 47%." },
+        comparativo: "A diferença mostra que o teto de conversão é alcançável — não é limite do mercado.",
+      },
+      vendedores: { leitura: "Pedro Henrique fecha bem mais rápido que a média — 2,5 dias contra 8,2. Vale mapear a rotina dessa pessoa." },
+      financeiro: { leitura: "Cada ponto a mais aqui é receita que não custa mídia nem lead novo — é a venda mais barata da operação." },
       cursos_vendidos: { leitura: "20 cursos diferentes venderam no período. Carteira concentrada: o lado bom é que você já sabe onde investir." },
       pagamento: { leitura: "Boleto Parcelado responde por 46,8% da receita. Oferecer a forma de maior ticket como primeira opção." },
       canal_google: { leitura: "R$ 9.528 investidos. A plataforma registrou 425 conversões, a R$ 22,42 cada." },
@@ -293,6 +299,8 @@ run(R("../app.js"), "app.js");
 
 await new Promise((r) => setTimeout(r, 900));
 
+
+
 const root = w.document.getElementById("root");
 const txt = root.textContent || "";
 
@@ -385,6 +393,13 @@ const okVend = clicar("Vendedores");
 await new Promise((r) => setTimeout(r, 600));
 const t3 = root.textContent || "";
 passos.push(["abriu a aba Vendedores", okVend]);
+{
+  const tv2 = [...w.document.querySelectorAll("[title]")].map((e) => e.getAttribute("title") || "");
+  passos.push(["leu o ritmo de fechamento do time",
+    tv2.some((t) => /Vale mapear a rotina dessa pessoa/.test(t))]);
+}
+
+
 {
   const tv = root.textContent || "";
   passos.push(["avisou sobre as duas bases de contagem",
@@ -507,6 +522,26 @@ passos.push(["alertou sobre leads sem curso declarado",
   passos.push(["explicou que pausado não é falha do painel",
     tt.some((t) => /não é falha do painel/.test(t))]);
   passos.push(["manteve o Google como saudável", /Google/.test(tf2) && !/Google \d+d/.test(tf2)]);
+}
+
+// Estes dois blocos ficam no FIM de proposito: navegar entre abas no meio das
+// assercoes fazia os checks seguintes rodarem na tela errada.
+{
+  const okFin = clicar("Financeiro & Produto");
+  await new Promise((r) => setTimeout(r, 420));
+  const tfin = [...w.document.querySelectorAll("[title]")].map((e) => e.getAttribute("title") || "");
+  passos.push(["leu a composição da receita no Financeiro",
+    okFin && tfin.some((t) => /venda mais barata da operação/.test(t))]);
+}
+
+{
+  clicar("Comercial");
+  await new Promise((r) => setTimeout(r, 350));
+  const okVG = clicar("Visão Geral");
+  await new Promise((r) => setTimeout(r, 450));
+  const tvg = [...w.document.querySelectorAll("[title]")].map((e) => e.getAttribute("title") || "");
+  passos.push(["leu o aproveitamento na Visão Geral",
+    okVG && tvg.some((t) => /aproveitamento é de 47%/.test(t) && /teto de conversão é alcançável/.test(t))]);
 }
 
 let falhou = false;
