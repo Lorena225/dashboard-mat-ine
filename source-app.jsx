@@ -3050,10 +3050,12 @@ function AbaMatriculas({ mat, schools }) {
           Critério conferido contra a planilha de julho/2026
         </div>
         <div style={{ fontSize: 11.5, lineHeight: 1.65, color: T.text, opacity: 0.9 }}>
-          Conta como matrícula o lead na etapa <b>MATRÍCULA REALIZADA</b> com <b>DATA PAGAMENTO MATRICULA</b>
-          dentro do período. A unidade contada é o <b>curso</b>, não o lead: aluno com mais de um curso listado
-          fez mais de uma matrícula. O crédito vai para quem está no <b>REGISTRO DE ATENDIMENTO</b>,
-          rateado quando há mais de um nome. Leads repetidos (mesmo aluno, curso e data) contam uma vez.
+          Conta como matrícula o lead na etapa <b>MATRÍCULA REALIZADA</b> — ou já movido ao funil
+          <b> SUCESSO DO ALUNO</b> (Boas-vindas, Jornada, Formado), pois só chega lá quem matriculou —
+          com <b>DATA PAGAMENTO MATRICULA</b> dentro do período. A unidade contada é o <b>curso</b>, não o
+          lead: aluno com mais de um curso listado fez mais de uma matrícula. O crédito vai para quem está
+          no <b>REGISTRO DE ATENDIMENTO</b>, rateado quando há mais de um nome. Leads repetidos (mesmo
+          aluno, curso e data) contam uma vez. Aluno cancelado sai da contagem do mês em que pagou.
         </div>
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 9, fontSize: 11, color: T.muted }}>
           <span>Matrículas: <b style={{ color: T.text }}>{dec(diag.total_matriculas)}</b></span>

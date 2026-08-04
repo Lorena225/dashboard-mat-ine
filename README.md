@@ -66,6 +66,20 @@ critério definitivo. Cobertura após o backfill de jul/2026:
 Maio ainda depende do fallback porque o campo não era preenchido de forma
 consistente naquele período.
 
+### 1b. Qual etapa conta
+
+Vale o card em **MATRÍCULA REALIZADA** *ou* em qualquer etapa **não-perdida** do funil
+**SUCESSO DO ALUNO** (Boas-vindas e Integração, Jornada do Aluno, Aluno Formado).
+
+O motivo é o ciclo de vida: depois de matricular, a operação move o aluno adiante —
+em 04/08/2026 esse movimento começou e derrubou silenciosamente uma matrícula de
+junho e (quase) uma de julho. Aluno só chega ao funil de sucesso depois de
+matricular, então estar lá **é** evidência da matrícula.
+
+**ALUNO CANCELADO** (`is_lost`) fica fora, igual a MATRÍCULA PERDIDA: o cancelamento
+remove a matrícula do mês da venda. Se a gestão preferir que estorno não abata o
+histórico, é ajuste de uma linha em `matriculas_periodo` — decisão de negócio.
+
 ### 2. Quem recebe o crédito
 
 Exclusivamente pelo campo **REGISTRO DE ATENDIMENTO** do lead (`kommo_leads.atendentes`). O responsável do card (`responsible_user_id`) **não** é usado.
