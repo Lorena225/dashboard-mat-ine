@@ -73,6 +73,19 @@ w.fetch = async (url) => ({
   status: 200,
   json: async () => {
     if (String(url).includes("dashboard_matriculas")) return MAT;
+    if (String(url).includes("dashboard_cursos")) return {
+      cursos: [
+        { curso: "TECNICO EM ELETROTECNICA", escola: "ineprotec", procurado: 184, vendido: 11, conversao: 6.0, faturamento: 22903 },
+        { curso: "TECNICO EM SEGURANCA DO TRABALHO", escola: "matricula_ead", procurado: 159, vendido: 6, conversao: 3.8, faturamento: 10456 },
+        { curso: "TECNICO EM AGRIMENSURA", escola: "ineprotec", procurado: 140, vendido: 26, conversao: 18.6, faturamento: 64637 },
+        { curso: "ESP. TEC. EM GEORREFERENCIAMENTO", escola: "ineprotec", procurado: 46, vendido: 21, conversao: 45.7, faturamento: 38000 },
+      ],
+      estados: [
+        { uf: "SP", escola: "matricula_ead", matriculas: 22, faturamento: 48301 },
+        { uf: "MG", escola: "ineprotec", matriculas: 20, faturamento: 44122 },
+      ],
+      sem_curso: { ineprotec: { leads: 174, pct: 27.5 }, matricula_ead: { leads: 359, pct: 44.2 } },
+    };
     if (String(url).includes("dashboard_insights")) return {
       matriculas: MAT.insights,
       marketing: {
@@ -275,6 +288,20 @@ for (const [rot, aba, re] of [
   const tt = [...w.document.querySelectorAll("[title]")].map((e) => e.getAttribute("title") || "");
   passos.push([`insight na aba ${rot}`, ok && tt.some((t) => re.test(t))]);
 }
+
+clicar("Comercial");
+await new Promise((r) => setTimeout(r, 350));
+clicar("Origem, Canal & Região");
+await new Promise((r) => setTimeout(r, 500));
+const to = root.textContent || "";
+passos.push(["trouxe o ranking de cursos procurados x vendidos",
+  /Cursos mais procurados x mais vendidos/.test(to) && /TECNICO EM AGRIMENSURA/.test(to)]);
+passos.push(["mostrou procura e venda lado a lado", /184/.test(to) && /18,6%/.test(to)]);
+passos.push(["trouxe o relatório de estados que mais vendem",
+  /Estados que mais vendem/.test(to) && /SP/.test(to) && /48.301/.test(to)]);
+passos.push(["calculou o ticket médio por estado", /2.195|2.196/.test(to)]);
+passos.push(["alertou sobre leads sem curso declarado",
+  /Leads sem curso declarado/.test(to) && /44,2%/.test(to)]);
 
 let falhou = false;
 for (const [nome, ok] of passos) {

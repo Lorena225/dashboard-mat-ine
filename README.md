@@ -156,6 +156,23 @@ Duas travas importantes, ambas motivadas por erros reais encontrados ao construi
 
 Quando não há base comparável, a frase é omitida em vez de inventar tendência.
 
+## Cursos e estados (aba Origem, Canal & Região)
+
+Dois blocos alimentados pela RPC `dashboard_cursos(token, from, to)`.
+
+**Cursos mais procurados x mais vendidos** — procura e venda na mesma linha, porque
+a diferença entre as duas é o que interessa. *Procurado* conta os leads que
+declararam interesse (campos de curso 1, 2 e 3); *vendido* são as matrículas do
+período. A conversão só ganha cor a partir de 15 procuras: abaixo disso o
+percentual oscila demais para significar algo.
+
+Rótulos genéricos (`OUTROS CURSOS`, `NAO INFORMADO`) ficam fora do ranking e viram
+um indicador próprio de qualidade de cadastro — em jul/2026, 44% dos leads da
+Matrícula EAD e 27% do Ineprotec entram sem curso declarado.
+
+**Estados que mais vendem** — matrículas, faturamento e ticket médio por UF. O
+estado vem do DDD do telefone; sem telefone, a matrícula aparece como `(sem UF)`.
+
 ## RPCs
 
 | RPC | Função |

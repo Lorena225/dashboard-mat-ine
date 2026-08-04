@@ -253,6 +253,8 @@ const SNAPSHOT = {
 // ── Utilitários ──
 const brl = (v) => "R$ " + Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 });
 const num = (v) => Number(v || 0).toLocaleString("pt-BR");
+// uma casa decimal quando ha fracao, inteiro quando nao ha (18,6 / 26)
+const dec1 = (v) => Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 1 });
 const pct = (v) => (v == null ? "—" : (v * 100).toFixed(1).replace(".", ",") + "%");
 const deltaPct = (cur, prev) => (prev > 0 ? (cur - prev) / prev : null);
 const bySchool = (rows, school) => rows.filter((r) => r.school === school);
@@ -1244,7 +1246,18 @@ function TituloComLeitura({ children, texto }) {
   );
 }
 
-function AbaOrigem({ data, extra, reg, schools, insg }) {
+function AbaOrigem({ data, extra, reg, schools, insg, crs }) {
+  const cursos = ((crs && crs.cursos) || []).filter((c) => schools.includes(c.escola));
+  const estados = ((crs && crs.estados) || [])
+    .filter((e) => schools.includes(e.escola))
+    .map((e) => ({ ...e, ticket: e.matriculas > 0 ? e.faturamento / e.matriculas : 0 }));
+  const semCurso = schools
+    .map((e) => {
+      const x = ((crs && crs.sem_curso) || {})[e];
+      return x ? { label: (SCHOOLS[e] || {}).label || e, leads: x.leads, pct: x.pct } : null;
+    })
+    .filter(Boolean);
+
   const leitura = (bloco, chave) => {
     const b = (insg && insg[bloco]) || {};
     if (chave) return b[chave] || null;
@@ -1467,6 +1480,91 @@ function AbaOrigem({ data, extra, reg, schools, insg }) {
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 14 }}>
       </div>
+
+      {/* ── Ranking de cursos: procura x venda lado a lado ── */}
+      <Panel title={<TituloComLeitura texto={
+        (() => {
+          const top = [...cursos].sort((a, b) => b.procurado - a.procurado)[0];
+          const pior = cursos.filter((c) => c.procurado >= 30)
+            .sort((a, b) => (a.conversao || 0) - (b.conversao || 0))[0];
+          const melhor = cursos.filter((c) => c.procurado >= 20)
+            .sort((a, b) => (b.conversao || 0) - (a.conversao || 0))[0];
+          if (!top) return null;
+          const p = [];
+          p.push(`Curso mais procurado: ${top.curso} (${num(top.procurado)} leads, ${dec1(top.conversao)}% de conversão).`);
+          if (pior && melhor && pior.curso !== melhor.curso) {
+            p.push(`A maior lacuna está em ${pior.curso}: ${num(pior.procurado)} pessoas procuraram e ${dec1(pior.conversao)}% fecharam. No outro extremo, ${melhor.curso} converte ${dec1(melhor.conversao)}%.`);
+            p.push("Curso muito procurado e pouco vendido é demanda já paga saindo pela porta: costuma render mais atacar essa conversão do que ampliar verba de mídia.");
+          }
+          return p.join(" ");
+        })()
+      }>Cursos mais procurados x mais vendidos</TituloComLeitura>}>
+        <DataTable
+          columns={[
+            { key: "escola", label: "Escola", render: (r) => <SchoolTag school={r.escola} /> },
+            { key: "curso", label: "Curso", style: { whiteSpace: "normal", minWidth: 190 } },
+            { key: "procurado", label: "Procurado", style: { textAlign: "right" },
+              render: (r) => num(r.procurado) },
+            { key: "vendido", label: "Vendido", style: { textAlign: "right" },
+              render: (r) => <b>{dec1(r.vendido)}</b> },
+            {
+              key: "conversao", label: "Conversão", style: { textAlign: "right" },
+              render: (r) => {
+                if (r.procurado === 0) return <span style={{ color: T.muted }}>—</span>;
+                const v = Number(r.conversao || 0);
+                // vermelho so quando ha procura suficiente para o numero significar algo
+                const cor = r.procurado < 15 ? T.muted : v >= 20 ? T.green : v < 6 ? T.red : T.text;
+                return <span style={{ color: cor, fontWeight: v >= 20 || v < 6 ? 600 : 400 }}>{dec1(v)}%</span>;
+              },
+            },
+            { key: "faturamento", label: "Faturamento", style: { textAlign: "right" },
+              render: (r) => brl(r.faturamento) },
+          ]}
+          rows={cursos}
+          initialSort={{ key: "procurado", dir: "desc" }}
+          pageSize={15}
+        />
+        <div style={{ fontSize: 11, color: T.muted, marginTop: 8, lineHeight: 1.6 }}>
+          <b>Procurado</b> = leads que declararam interesse no curso (contando os campos de curso 1, 2 e 3).
+          {" "}<b>Vendido</b> = matrículas efetivadas no período. Conversão em vermelho abaixo de 6% e em verde
+          acima de 20%, só quando há pelo menos 15 procuras — abaixo disso o percentual oscila demais.
+        </div>
+        {semCurso.length > 0 && (
+          <div style={{
+            marginTop: 10, padding: "9px 12px", borderRadius: 8,
+            background: T.amber + T.tint, border: `1px solid ${T.amber}${T.tintForte}`,
+            fontSize: 11.5, lineHeight: 1.6,
+          }}>
+            <b>Leads sem curso declarado:</b> {semCurso.map((x) => `${x.label} ${num(x.leads)} (${dec1(x.pct)}%)`).join(" · ")}.
+            Esses leads não aparecem no ranking — sem o curso preenchido, não há como saber que demanda eles representam.
+          </div>
+        )}
+      </Panel>
+
+      {/* ── Estados que mais vendem ── */}
+      <Panel title={<TituloComLeitura texto={leitura("regiao", "dispersao")}>
+        Estados que mais vendem
+      </TituloComLeitura>}>
+        <DataTable
+          columns={[
+            { key: "uf", label: "UF" },
+            { key: "escola", label: "Escola", render: (r) => <SchoolTag school={r.escola} /> },
+            { key: "matriculas", label: "Matrículas", style: { textAlign: "right" },
+              render: (r) => <b>{dec1(r.matriculas)}</b> },
+            { key: "faturamento", label: "Faturamento", style: { textAlign: "right" },
+              render: (r) => brl(r.faturamento) },
+            { key: "ticket", label: "Ticket médio", style: { textAlign: "right" },
+              render: (r) => brl(r.ticket) },
+          ]}
+          rows={estados}
+          initialSort={{ key: "matriculas", dir: "desc" }}
+          pageSize={12}
+        />
+        <div style={{ fontSize: 11, color: T.muted, marginTop: 8 }}>
+          Estado obtido pelo DDD do telefone do contato. Matrículas sem telefone cadastrado
+          aparecem como <b>(sem UF)</b>.
+        </div>
+      </Panel>
     </div>
   );
 }
@@ -1993,6 +2091,7 @@ function AbaJornada({ jor, schools, insg }) {
         />
         <div style={{ fontSize: 11.5, color: T.muted, marginTop: 8 }}>Rastreio pelo campo Origem do Lead no Kommo — canal e campanha extraídos do padrão gravado na entrada.</div>
       </Panel>
+
     </div>
   );
 }
@@ -3039,6 +3138,7 @@ export default function DashboardEdilvo() {
   const [aba, setAba] = useState("visao");
   const [mat, setMat] = useState(null);
   const [insg, setInsg] = useState(null);
+  const [crs, setCrs] = useState(null);
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [applied, setApplied] = useState(null);
@@ -3099,9 +3199,10 @@ export default function DashboardEdilvo() {
       rpc("dashboard_pipeline", { p_token: RPC_TOKEN, p_from: from, p_to: to }),
       rpc("dashboard_matriculas", { p_token: RPC_TOKEN, p_from: from, p_to: to, p_school: null }),
       rpc("dashboard_insights", { p_token: RPC_TOKEN, p_from: from, p_to: to }),
+      rpc("dashboard_cursos", { p_token: RPC_TOKEN, p_from: from, p_to: to }),
     ])
-      .then(([j, m, x, w, s, jo, q, fl, rg, od, pp, mt, isg]) => {
-        setQual(q); setFila(fl); setReg(rg); setOrig(od); setPipe(pp); setMat(mt); setInsg(isg);
+      .then(([j, m, x, w, s, jo, q, fl, rg, od, pp, mt, isg, cr]) => {
+        setQual(q); setFila(fl); setReg(rg); setOrig(od); setPipe(pp); setMat(mt); setInsg(isg); setCrs(cr);
         if (w) { j = { ...j, vendedores: w.vendedores, cursos: w.cursos, faixas: w.faixas, vendedores_coorte: w.vendedores_coorte }; }
         setData(j); setMkt(m); setExtra(x); setSdr(s); setJor(jo); setLoading(false);
       })
@@ -3230,7 +3331,7 @@ export default function DashboardEdilvo() {
                     {aba === "funil" && <AbaFunilPerdas data={data} schools={schools} insg={insg} />}
                     {aba === "vendedores" && <AbaVendedores data={data} schools={schools} mat={mat} />}
                     {aba === "matriculas" && <AbaMatriculas mat={mat} schools={schools} />}
-                    {aba === "origem" && <AbaOrigem data={data} extra={extra} reg={reg} schools={schools} insg={insg} />}
+                    {aba === "origem" && <AbaOrigem data={data} extra={extra} reg={reg} schools={schools} insg={insg} crs={crs} />}
                     {aba === "financeiro" && <AbaFinanceiro data={data} schools={schools} />}
                     {aba === "metas" && <AbaMetas data={data} periodoFrom={periodoAtualFrom} onSaved={() => setReload((r) => r + 1)} />}
                     {aba === "sdr" && <AbaSDR sdr={sdr} schools={schools} insg={insg} />}
